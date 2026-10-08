@@ -1,0 +1,7 @@
+.venv/
+.cache/
+.mplcache/
+__pycache__/
+.pytest_cache/
+data/.yfinance_cache/
+*.pyc

@@ -1,0 +1,113 @@
+{
+  "executed_utc": "2026-10-08T13:21:08.759545+00:00",
+  "config": {
+    "vol_target": 0.1,
+    "equity_cap": 1.5,
+    "base_weight": 0.75,
+    "allocation_step": 0.75,
+    "lookthrough_step": 0.5,
+    "deduction": 0.005,
+    "servicing": 0.005,
+    "transaction": 0.0001,
+    "lambda_short": 0.94,
+    "lambda_long": 0.97,
+    "seed_short": 0.120433,
+    "seed_long": 0.146234,
+    "day_basis": 360.0,
+    "official_seed_date": "2021-05-03",
+    "index_base_date": "2021-06-01",
+    "launch_date": "2023-07-28",
+    "calendar": "XNYS",
+    "short_window": 20,
+    "long_window": 60,
+    "signal_leverages": [
+      0.75,
+      0.75,
+      0.75,
+      0.75,
+      1.5
+    ]
+  },
+  "arguments": {
+    "start": null,
+    "end": "2026-10-08",
+    "download_start": "2014-01-01",
+    "data_dir": "/Users/hamzaahmed/Documents/Codex/2026-10-08/you-are-an-expert-quantitative-researcher/outputs/timex_project/data",
+    "output_dir": "/Users/hamzaahmed/Documents/Codex/2026-10-08/you-are-an-expert-quantitative-researcher/outputs/timex_project/results",
+    "offline": true,
+    "official_levels": null,
+    "vol_target": 0.1,
+    "verbose": false
+  },
+  "data": {
+    "first_price": "2014-01-02",
+    "last_price": "2026-10-07",
+    "rows": 3210,
+    "DFF_last": "2026-10-06",
+    "DFF_max_staleness_days": 0,
+    "DTB3_last": "2026-10-06",
+    "DTB3_max_staleness_days": 3
+  },
+  "diagnostics": {
+    "comparison_start": "2016-10-07",
+    "comparison_end": "2026-10-07",
+    "comparison_observations": 2512,
+    "warmup_observations": 697,
+    "mean_held_exposure": 0.6778771591087815,
+    "fraction_held_at_150pct": 0.04617834394904458,
+    "maximum_actual_nav_exposure": 1.5002264889674908,
+    "explicit_nominal_costs_per_initial_100": 17.972115930582735,
+    "nofee_annualized_return": 0.07972606769058177,
+    "fee_cagr_reduction_pp": 1.226663493297342,
+    "mean_annual_nominal_cost_rate": 0.011431837412620964,
+    "cash_vs_adjusted_total_return_max_daily_difference": 0.00025221368986486775,
+    "max_final_weight_step": 0.5000000000000001,
+    "max_allocation_step": 0.7500000000000001,
+    "explicit_fee_terminal_loss_per_100": 23.246089821198353,
+    "explicit_fee_relative_wealth_loss": 0.1079591978924177,
+    "dividend_forfeit_terminal_loss_per_100": 22.927940477742197,
+    "financing_terminal_loss_per_100": 33.92573305524877,
+    "attribution_reconciliation_error": -2.842170943040401e-14
+  },
+  "official_audit": {
+    "status": "not performed: official GSEQTMX levels not supplied"
+  },
+  "fomc_coverage": {
+    "start": "2014-01-01",
+    "end": "2026-10-08",
+    "verified_as_of": "2026-10-08",
+    "point_in_time": false,
+    "notes": [
+      "Source-backed final historical Federal Reserve calendars, not a dated vendor schedule archive.",
+      "Scheduled policy announcement dates use the second/final meeting day, not the first meeting day.",
+      "Baseline event_type scheduled contains 101 realized scheduled decisions.",
+      "Two unscheduled statements, six notation votes, and cancelled 2020-03-18 are retained for audit and excluded from scheduled-only signals.",
+      "2020-03-18 must be tested as a calendar sensitivity because its eligibility at the four-index-business-day cutoff is not certified.",
+      "2026-10-28 and 2026-12-09 are future scheduled dates relative to this verification date and are not in the historical CSV.",
+      "Verify and extend the data from official Fed sources before a run outside the stated coverage."
+    ]
+  },
+  "methodology": "https://www.goldmansachs.com/what-we-do/ficc-and-equities/products-and-business-groups/products/index-methodologies",
+  "script_sha256": "4915a54ccffddce31f78410c3de548328afb3cb4a6c094fe6452fdb17d7ba0d5",
+  "input_sha256": {
+    "dtb3.csv": "dc2cba27e9a82f5a20fcf8727b7a20930c6e7ea0b76e8185b79e9dbb02404e61",
+    "dff.csv": "6ed84ba54bcf89bf5f6d6973e1edcd6493b670b56b37f6dfe5116a6b6e1ecc4b",
+    "fomc_calendar.csv": "75597c1441edad80caab1df4bb0e3fac88f635865e450854981f56271bb1fe9e",
+    "spy.csv": "1c5d04b4603934ae76b0fed06230bfced2ca8bbc183f8d92dab9fe2211d124ae"
+  },
+  "versions": {
+    "pandas": "2.2.3",
+    "numpy": "2.3.5",
+    "yfinance": "1.7.0",
+    "matplotlib": "3.11.2",
+    "seaborn": "0.13.2",
+    "exchange_calendars": "4.13.2"
+  },
+  "limitations": [
+    "Research extension before index base date",
+    "NYSE calendar proxy for Arca",
+    "Final-vintage Yahoo/FRED data",
+    "FOMC archive not point-in-time vendor history",
+    "Official disruptions, amendments and restatements not modeled"
+  ]
+}

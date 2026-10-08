@@ -1,0 +1,54 @@
+{
+  "requested_start": "2014-01-01",
+  "requested_end_exclusive": "2026-10-08",
+  "yfinance_version": "1.7.0",
+  "sources": {
+    "SPY": {
+      "file": "spy.csv",
+      "url": "https://finance.yahoo.com/quote/SPY/history/",
+      "downloaded_at_utc": "2026-10-08T12:51:26.003786+00:00",
+      "sha256": "1c5d04b4603934ae76b0fed06230bfced2ca8bbc183f8d92dab9fe2211d124ae",
+      "rows": 3210,
+      "first_actual_observation": "2014-01-02",
+      "last_actual_observation": "2026-10-07",
+      "download_parameters": {
+        "start": "2014-01-01",
+        "end_exclusive": "2026-10-08",
+        "auto_adjust": false,
+        "actions": true
+      },
+      "adjusted_close_definition": "Yahoo historical adjusted close, reflecting distributions and splits",
+      "original_acquisition_filename": "spy_yfinance.csv"
+    },
+    "DFF": {
+      "file": "dff.csv",
+      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF&cosd=2014-01-01&coed=2026-10-07",
+      "downloaded_at_utc": "2026-10-08T12:51:27.465683+00:00",
+      "sha256": "6ed84ba54bcf89bf5f6d6973e1edcd6493b670b56b37f6dfe5116a6b6e1ecc4b",
+      "rows": 4662,
+      "first_actual_observation": "2014-01-01",
+      "last_actual_observation": "2026-10-06",
+      "units": "annual percentage points",
+      "source_page": "https://fred.stlouisfed.org/series/DFF",
+      "raw_file": "dff_fred_raw.csv",
+      "raw_sha256": "f170a3bc137859f0f20a411ff3dd43fdb6b77a315ac88d8ada8bbaa618f5699d",
+      "missing_observations": 0,
+      "original_acquisition_filename": "dff_fred.csv"
+    },
+    "DTB3": {
+      "file": "dtb3.csv",
+      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3&cosd=2014-01-01&coed=2026-10-07",
+      "downloaded_at_utc": "2026-10-08T12:51:28.511834+00:00",
+      "sha256": "dc2cba27e9a82f5a20fcf8727b7a20930c6e7ea0b76e8185b79e9dbb02404e61",
+      "rows": 3329,
+      "first_actual_observation": "2014-01-02",
+      "last_actual_observation": "2026-10-06",
+      "units": "annual percentage points",
+      "source_page": "https://fred.stlouisfed.org/series/DTB3",
+      "raw_file": "dtb3_fred_raw.csv",
+      "raw_sha256": "3c77468fcb36e3719358e30fc006ec25cbf50235481fdae25b7d3fd203e7be77",
+      "missing_observations": 137,
+      "original_acquisition_filename": "dtb3_fred.csv"
+    }
+  }
+}

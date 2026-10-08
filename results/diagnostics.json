@@ -1,0 +1,21 @@
+{
+  "comparison_start": "2016-10-07",
+  "comparison_end": "2026-10-07",
+  "comparison_observations": 2512,
+  "warmup_observations": 697,
+  "mean_held_exposure": 0.6778771591087815,
+  "fraction_held_at_150pct": 0.04617834394904458,
+  "maximum_actual_nav_exposure": 1.5002264889674908,
+  "explicit_nominal_costs_per_initial_100": 17.972115930582735,
+  "nofee_annualized_return": 0.07972606769058177,
+  "fee_cagr_reduction_pp": 1.226663493297342,
+  "mean_annual_nominal_cost_rate": 0.011431837412620964,
+  "cash_vs_adjusted_total_return_max_daily_difference": 0.00025221368986486775,
+  "max_final_weight_step": 0.5000000000000001,
+  "max_allocation_step": 0.7500000000000001,
+  "explicit_fee_terminal_loss_per_100": 23.246089821198353,
+  "explicit_fee_relative_wealth_loss": 0.1079591978924177,
+  "dividend_forfeit_terminal_loss_per_100": 22.927940477742197,
+  "financing_terminal_loss_per_100": 33.92573305524877,
+  "attribution_reconciliation_error": -2.842170943040401e-14
+}

@@ -1,0 +1,9 @@
+Step (order dependent),Terminal Wealth per 100,Incremental Impact per 100,Incremental Relative Impact
+SPY adjusted total return,423.22272818,0,0
+Explicit cash-dividend total return,423.507084837,0.284356657463,0.000671884184212
+Signal allocation,557.224993617,133.71790878,0.31573948481
+Volatility control + caps,253.350192666,-303.874800952,-0.545335913558
+Fed Funds excess return,215.322920835,-38.0272718307,-0.150097662964
+Servicing cost,208.177601715,-7.14531912025,-0.0331842011642
+Rebalancing cost,202.065515972,-6.1120857424,-0.029359958478
+Index deduction / net reconstruction,192.076831014,-9.98868495855,-0.0494329025439

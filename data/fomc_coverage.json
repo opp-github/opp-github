@@ -1,0 +1,15 @@
+{
+  "start": "2014-01-01",
+  "end": "2026-10-08",
+  "verified_as_of": "2026-10-08",
+  "point_in_time": false,
+  "notes": [
+    "Source-backed final historical Federal Reserve calendars, not a dated vendor schedule archive.",
+    "Scheduled policy announcement dates use the second/final meeting day, not the first meeting day.",
+    "Baseline event_type scheduled contains 101 realized scheduled decisions.",
+    "Two unscheduled statements, six notation votes, and cancelled 2020-03-18 are retained for audit and excluded from scheduled-only signals.",
+    "2020-03-18 must be tested as a calendar sensitivity because its eligibility at the four-index-business-day cutoff is not certified.",
+    "2026-10-28 and 2026-12-09 are future scheduled dates relative to this verification date and are not in the historical CSV.",
+    "Verify and extend the data from official Fed sources before a run outside the stated coverage."
+  ]
+}
