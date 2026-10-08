@@ -13,9 +13,31 @@
   "cash_vs_adjusted_total_return_max_daily_difference": 0.00025221368986486775,
   "max_final_weight_step": 0.5000000000000001,
   "max_allocation_step": 0.7500000000000001,
+  "short_mr_max_abs": 0.07011009502267611,
+  "short_mr_theoretical_bound": 0.07386710503565987,
+  "fomc_lookahead": {
+    "last_price": "2026-10-07",
+    "lookahead_required_through": "2026-10-09",
+    "coverage_end": "2026-10-08",
+    "certified_by": "next scheduled announcement 2026-10-28 lies beyond the look-ahead"
+  },
+  "dividend_convention": {
+    "dividend_events_total": 51,
+    "dividend_events_in_comparison": 40,
+    "cash_dividend_tr_wealth": 423.5070848374148,
+    "vendor_adj_close_tr_wealth": 423.2227281799518,
+    "identity_tr_wealth": 423.2228563415834,
+    "relative_difference": 0.0006718841842117129,
+    "share_of_gap_explained_by_reinvestment_convention": 0.9995492926638285,
+    "max_abs_vendor_minus_identity_bp": 0.007435545827938483,
+    "max_abs_daily_cash_minus_vendor_bp": 2.5221368986486774,
+    "max_abs_daily_difference_date": "2020-03-20"
+  },
   "explicit_fee_terminal_loss_per_100": 23.246089821198353,
   "explicit_fee_relative_wealth_loss": 0.1079591978924177,
   "dividend_forfeit_terminal_loss_per_100": 22.927940477742197,
-  "financing_terminal_loss_per_100": 33.92573305524877,
-  "attribution_reconciliation_error": -2.842170943040401e-14
+  "financing_terminal_loss_per_100": 33.92573305524897,
+  "attribution_reconciliation_error": -2.842170943040401e-14,
+  "inception_vs_extended_terminal_difference": -0.00015691102929338285,
+  "inception_vs_extended_max_weight_difference_after_2021_09": 3.939829485499757e-05
 }

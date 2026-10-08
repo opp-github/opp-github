@@ -1,0 +1,6 @@
+Measure,Unit,Total,Index deduction,Servicing,Rebalancing
+Sum of nominal daily charges,per initial 100,17.9721159306,8.01819108165,5.22989270896,4.72403213997
+Compounded terminal wealth lost (Shapley),per initial 100,23.2460898212,10.3144642396,6.86752667333,6.06409890832
+Relative terminal-wealth loss,% of no-fee terminal wealth,10.7959197892,,,
+CAGR reduction,percentage points,1.2266634933,,,
+Mean annual nominal charge rate,% of prior net NAV per year,1.14318374126,0.507291666667,0.337704949551,0.298187125045

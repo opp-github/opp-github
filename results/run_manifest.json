@@ -1,5 +1,5 @@
 {
-  "executed_utc": "2026-10-08T13:21:08.759545+00:00",
+  "executed_utc": "2026-10-08T14:16:37.806028+00:00",
   "config": {
     "vol_target": 0.1,
     "equity_cap": 1.5,
@@ -30,23 +30,40 @@
   },
   "arguments": {
     "start": null,
-    "end": "2026-10-08",
+    "end": null,
     "download_start": "2014-01-01",
-    "data_dir": "/Users/hamzaahmed/Documents/Codex/2026-10-08/you-are-an-expert-quantitative-researcher/outputs/timex_project/data",
-    "output_dir": "/Users/hamzaahmed/Documents/Codex/2026-10-08/you-are-an-expert-quantitative-researcher/outputs/timex_project/results",
+    "data_dir": null,
+    "output_dir": "/home/user/opp-github/results",
     "offline": true,
+    "overwrite_inputs": false,
+    "fomc_calendar": "/home/user/opp-github/data/fomc_calendar.csv",
     "official_levels": null,
     "vol_target": 0.1,
     "verbose": false
   },
+  "resolved": {
+    "data_dir": "/home/user/opp-github/data",
+    "end_exclusive": "2026-10-08",
+    "sample_start": "2014-01-01"
+  },
+  "fresh_download": "not executed (offline run on the frozen snapshot)",
+  "data_revisions_vs_frozen": null,
   "data": {
     "first_price": "2014-01-02",
     "last_price": "2026-10-07",
     "rows": 3210,
+    "dividend_events": 51,
+    "split_events": 0,
     "DFF_last": "2026-10-06",
     "DFF_max_staleness_days": 0,
     "DTB3_last": "2026-10-06",
-    "DTB3_max_staleness_days": 3
+    "DTB3_max_staleness_days": 3,
+    "sample_bounds": {
+      "requested_start": "2014-01-01",
+      "requested_end_exclusive": "2026-10-08",
+      "sessions_expected": 3210,
+      "sessions_present": 3210
+    }
   },
   "diagnostics": {
     "comparison_start": "2016-10-07",
@@ -63,11 +80,33 @@
     "cash_vs_adjusted_total_return_max_daily_difference": 0.00025221368986486775,
     "max_final_weight_step": 0.5000000000000001,
     "max_allocation_step": 0.7500000000000001,
+    "short_mr_max_abs": 0.07011009502267611,
+    "short_mr_theoretical_bound": 0.07386710503565987,
+    "fomc_lookahead": {
+      "last_price": "2026-10-07",
+      "lookahead_required_through": "2026-10-09",
+      "coverage_end": "2026-10-08",
+      "certified_by": "next scheduled announcement 2026-10-28 lies beyond the look-ahead"
+    },
+    "dividend_convention": {
+      "dividend_events_total": 51,
+      "dividend_events_in_comparison": 40,
+      "cash_dividend_tr_wealth": 423.5070848374148,
+      "vendor_adj_close_tr_wealth": 423.2227281799518,
+      "identity_tr_wealth": 423.2228563415834,
+      "relative_difference": 0.0006718841842117129,
+      "share_of_gap_explained_by_reinvestment_convention": 0.9995492926638285,
+      "max_abs_vendor_minus_identity_bp": 0.007435545827938483,
+      "max_abs_daily_cash_minus_vendor_bp": 2.5221368986486774,
+      "max_abs_daily_difference_date": "2020-03-20"
+    },
     "explicit_fee_terminal_loss_per_100": 23.246089821198353,
     "explicit_fee_relative_wealth_loss": 0.1079591978924177,
     "dividend_forfeit_terminal_loss_per_100": 22.927940477742197,
-    "financing_terminal_loss_per_100": 33.92573305524877,
-    "attribution_reconciliation_error": -2.842170943040401e-14
+    "financing_terminal_loss_per_100": 33.92573305524897,
+    "attribution_reconciliation_error": -2.842170943040401e-14,
+    "inception_vs_extended_terminal_difference": -0.00015691102929338285,
+    "inception_vs_extended_max_weight_difference_after_2021_09": 3.939829485499757e-05
   },
   "official_audit": {
     "status": "not performed: official GSEQTMX levels not supplied"
@@ -77,6 +116,8 @@
     "end": "2026-10-08",
     "verified_as_of": "2026-10-08",
     "point_in_time": false,
+    "next_scheduled_after_coverage": "2026-10-28",
+    "next_scheduled_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
     "notes": [
       "Source-backed final historical Federal Reserve calendars, not a dated vendor schedule archive.",
       "Scheduled policy announcement dates use the second/final meeting day, not the first meeting day.",
@@ -84,30 +125,137 @@
       "Two unscheduled statements, six notation votes, and cancelled 2020-03-18 are retained for audit and excluded from scheduled-only signals.",
       "2020-03-18 must be tested as a calendar sensitivity because its eligibility at the four-index-business-day cutoff is not certified.",
       "2026-10-28 and 2026-12-09 are future scheduled dates relative to this verification date and are not in the historical CSV.",
-      "Verify and extend the data from official Fed sources before a run outside the stated coverage."
+      "Verify and extend the data from official Fed sources before a run outside the stated coverage.",
+      "next_scheduled_after_coverage certifies the two-session FOMC look-ahead of the final price date; it must be re-verified whenever coverage is extended."
     ]
   },
   "methodology": "https://www.goldmansachs.com/what-we-do/ficc-and-equities/products-and-business-groups/products/index-methodologies",
-  "script_sha256": "4915a54ccffddce31f78410c3de548328afb3cb4a6c094fe6452fdb17d7ba0d5",
+  "published_anchors": [
+    {
+      "key": "seed_vol_094",
+      "label": "0.94 EWMA vol, 3 May 2021",
+      "published": 12.0433,
+      "decimals": 4,
+      "family": "Seed volatility",
+      "source": "Methodology PDF p.9 (printed p.7): Asset Initialization Volatility",
+      "start": null,
+      "years": null
+    },
+    {
+      "key": "seed_vol_097",
+      "label": "0.97 EWMA vol, 3 May 2021",
+      "published": 14.6234,
+      "decimals": 4,
+      "family": "Seed volatility",
+      "source": "Methodology PDF p.9 (printed p.7): Asset Initialization Volatility",
+      "start": null,
+      "years": null
+    },
+    {
+      "key": "return_1y",
+      "label": "1Y return to 28 Jul 2023",
+      "published": 2.15,
+      "decimals": 2,
+      "family": "Trailing return",
+      "source": "Brochure PDF p.6: 1 Year Return, 27 Jul 2022 - 28 Jul 2023",
+      "start": "2022-07-27",
+      "years": 1
+    },
+    {
+      "key": "return_3y",
+      "label": "3Y annualized return",
+      "published": 5.32,
+      "decimals": 2,
+      "family": "Trailing return",
+      "source": "Brochure PDF p.6: 3 Year Annualized Return, 27 Jul 2020 - 28 Jul 2023",
+      "start": "2020-07-27",
+      "years": 3
+    },
+    {
+      "key": "return_5y",
+      "label": "5Y annualized return",
+      "published": 6.02,
+      "decimals": 2,
+      "family": "Trailing return",
+      "source": "Brochure PDF p.6: 5 Year Annualized Return, 27 Jul 2018 - 28 Jul 2023",
+      "start": "2018-07-27",
+      "years": 5
+    },
+    {
+      "key": "cost_rate_avg",
+      "label": "Servicing + rebalancing, rolling 1Y average",
+      "published": 0.61,
+      "decimals": 2,
+      "family": "Cost rate",
+      "source": "Methodology PDF p.5 (printed p.3) Summary s.5; GS sample 3 Jan 2000 - 28 Jul 2023",
+      "start": null,
+      "years": null
+    },
+    {
+      "key": "cost_rate_max",
+      "label": "Servicing + rebalancing, rolling 1Y high",
+      "published": 0.92,
+      "decimals": 2,
+      "family": "Cost rate",
+      "source": "Methodology PDF p.5 (printed p.3) Summary s.5; GS sample 3 Jan 2000 - 28 Jul 2023",
+      "start": null,
+      "years": null
+    }
+  ],
+  "script_sha256": "72074063a048e36f10f5ee8e48a41ee1be19160d8ce2aa953151dcf6152061ae",
   "input_sha256": {
-    "dtb3.csv": "dc2cba27e9a82f5a20fcf8727b7a20930c6e7ea0b76e8185b79e9dbb02404e61",
     "dff.csv": "6ed84ba54bcf89bf5f6d6973e1edcd6493b670b56b37f6dfe5116a6b6e1ecc4b",
+    "dtb3.csv": "dc2cba27e9a82f5a20fcf8727b7a20930c6e7ea0b76e8185b79e9dbb02404e61",
     "fomc_calendar.csv": "75597c1441edad80caab1df4bb0e3fac88f635865e450854981f56271bb1fe9e",
     "spy.csv": "1c5d04b4603934ae76b0fed06230bfced2ca8bbc183f8d92dab9fe2211d124ae"
   },
+  "fomc_calendar_sha256": "75597c1441edad80caab1df4bb0e3fac88f635865e450854981f56271bb1fe9e",
+  "output_sha256": {
+    "convention_fingerprint.csv": "29a7820d004386e29f4f3afeeee4f51227299409caf810ff754a99391950ae96",
+    "cost_shapley.csv": "a4712de9b63b81072b892c33a1dadbb0477d60710aa1de60d803edcf028dfb54",
+    "counterfactual_curves.csv": "3dba13faa1033d31803b02af1cf280656284e9ee3fc3b50fe40171c21881679b",
+    "daily_audit_ledger.csv": "522cabaf52f73c2560217b90f9a8daa7063eda628a2c8654649bde1c935b2f7d",
+    "dividend_convention_audit.csv": "fc6929ef4dfaea5799f9b9b5d979a11622cb7864c5b7610c611211b537245672",
+    "drag_attribution.csv": "cb474bd1c0ddba4966d00ae5c19366fde7116fbd93baf27054e7b7e5e3b1d071",
+    "drag_attribution.png": "043ced4ea63a13b9cc2982542212e6ccbbbe3bc3cadea1c84cc0b6e53a11da61",
+    "drag_attribution.svg": "a8de4e77b71eda6f4b0fb1bcacffe9391422d9f0d8806d96667e9c8ddd063785",
+    "equity_curves.csv": "190b2efe0fdc8e8e6965b91c27636e541557dc1facda89c0b4a8ecef0f4e2c7b",
+    "fee_drag_measures.csv": "5a46d1a4da2239f88f0b8633a6594d30bfb7190184a0d9f2c80462577c935b87",
+    "historical_stress.csv": "0dc3ad8ec319a33a54095eeaaf04000c854ac928434223d5c20821c3238829ad",
+    "official_inception_daily.csv": "332791e4b2b65bb65a883551ba231b25c49d10d8d3952ea02a7c1bd8b6b019b5",
+    "parameter_sensitivity.csv": "bb5ac99d59f7a9a51c00180f9dd1a217276421c2baeb7fd794cfea63ec29e3f5",
+    "performance_summary.csv": "652b587b50863362574c266bb16e624aeac4a71b36b49157cdd90cc53e93b318",
+    "published_anchor_checks.csv": "5338e454870b13d0a90882910149daa6300cceb2374b7b9201a5915bf66f6327",
+    "published_anchor_checks.png": "4adb506cfb859d31b9a8e057d26493dc8ec7d8e8dc2c81a150a303796be23ac7",
+    "published_anchor_checks.svg": "83574b9156737ffbd10de81b41dd9b0c9c502056159b73c32487b72486262603",
+    "requested_approximation_daily.csv": "9de772388a3a1fe51c02ab8ea9cdd141dd4b70f22ac837d3f91e7701c96a9aca",
+    "requested_approximation_summary.csv": "1769cc8385d72dcda7cda9779223bd9acd7b6ac3ec09a55688cc8f94322d488c",
+    "research_report.md": "326aa61c25cbb3ff7380abdcb1fb2cb41c0b0c148a6e2448305e9d0d28b3b99c",
+    "synthetic_gap.png": "46f77033244169ca067bf25f9bd79ed966c7cdcee06776227256333c9d7009b8",
+    "synthetic_gap.svg": "e868b095a01a496b6e850c4b4bfbc9f6d7cac1f7fd506a33c6b4110c486058dd",
+    "synthetic_paths.csv": "defcb46a96785e79cdb1c5bbc10e2980e04e32aa9b8ae1552055199d2a61e8fd",
+    "synthetic_stress.csv": "a1591327b43d29c31c03514308fd972064510d2d890ec37569e2624625afc1cb",
+    "timex_dashboard.png": "7e229374a4a580b807f130ecfa127f3c63b052e63642598dd3433e9924643417",
+    "timex_dashboard.svg": "3b7f86626686585647e986e524208603fae7a7af1c6a280e0b93eb6212d9308a"
+  },
+  "python": "3.13.16",
+  "platform": "Linux-6.18.44-fc-v80-x86_64-with-glibc2.39",
   "versions": {
     "pandas": "2.2.3",
     "numpy": "2.3.5",
     "yfinance": "1.7.0",
     "matplotlib": "3.11.2",
     "seaborn": "0.13.2",
-    "exchange_calendars": "4.13.2"
+    "exchange_calendars": "4.13.2",
+    "requests": "2.34.2",
+    "pytest": "9.1.1"
   },
   "limitations": [
     "Research extension before index base date",
     "NYSE calendar proxy for Arca",
     "Final-vintage Yahoo/FRED data",
     "FOMC archive not point-in-time vendor history",
-    "Official disruptions, amendments and restatements not modeled"
+    "Official disruptions, amendments and restatements not modeled",
+    "Published anchors are GS backtest/initialization figures, not official daily levels"
   ]
 }

@@ -1,0 +1,11 @@
+Convention,"0.94 EWMA vol, 3 May 2021","0.97 EWMA vol, 3 May 2021",1Y return to 28 Jul 2023,3Y annualized return,5Y annualized return,"Servicing + rebalancing, rolling 1Y average","Servicing + rebalancing, rolling 1Y high",Anchors Contradicting,Verdict
+Methodology baseline,12.0433062556,14.6207057321,2.52146549328,5.21569937089,6.06943732852,0.637310205092,0.926359938391,none,methodology
+Dividends forfeited (Close-only ER),12.100933217,14.6976180984,1.77922141253,4.3737622626,4.98730005435,0.633883478939,0.925666979937,"0.94 EWMA vol, 3 May 2021; 0.97 EWMA vol, 3 May 2021; 3Y annualized return; 5Y annualized return",contradicted by published anchors
+Yahoo Adj Close total return in ER,12.0433826812,14.6208460343,2.51606692365,5.20895699764,6.0652528618,0.637289512987,0.926358987457,none,not distinguishable at anchor precision
+DTB3 money-market funding,12.0443475482,14.6214666596,2.39786257172,5.15851617214,6.04010324005,0.637302256631,0.926360245126,none,not distinguishable at anchor precision
+Same-day Fed Funds (look-ahead),12.0432288285,14.620643874,2.51577794144,5.21324774105,6.06861714328,0.637309152926,0.926349888136,none,not distinguishable at anchor precision
+ACT/365 financing accrual,12.0433270016,14.620722969,2.55167638836,5.22698774294,6.08292596334,0.637309862752,0.926360651755,none,not distinguishable at anchor precision
+ToM-MR reference EOM-4 (brochure wording),12.0433062556,14.6207057321,1.37507605468,4.78260756296,5.80332514458,0.632026438764,0.918454739348,3Y annualized return; 5Y annualized return,contradicted by published anchors
+Same-day volatility in target (VC_t),12.0433062556,14.6207057321,2.58545812372,5.15167711652,6.10321630239,0.635212231333,0.923989698898,none,not distinguishable at anchor precision
+EWMA on unallocated SPY ER,11.4214000173,13.1256101859,3.65766486696,5.90800799478,6.36974893042,0.656601824607,0.917281654356,"0.94 EWMA vol, 3 May 2021; 0.97 EWMA vol, 3 May 2021; 1Y return to 28 Jul 2023; 3Y annualized return; 5Y annualized return",contradicted by published anchors
+"Servicing on NAV, not notional",12.0433062556,14.6207057321,2.25829083143,4.97189042088,5.83364515435,0.803537299369,0.905805952796,"3Y annualized return; 5Y annualized return; Servicing + rebalancing, rolling 1Y average",contradicted by published anchors
