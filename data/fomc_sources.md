@@ -79,3 +79,17 @@ fully free of calendar look-ahead.
 The checked-in calendar must be explicitly extended using verified primary
 sources when running beyond its coverage; absence of future rows is not a
 claim that no meetings occur after 2026-10-08.
+
+## Look-ahead certification (added in the 2026-10-08 audit)
+
+The FOMC decision at close T depends on whether T+1 or T+2 is a scheduled
+announcement. Coverage ending on the day after the last price therefore does
+not by itself certify the final decision. `fomc_coverage.json` now records
+`next_scheduled_after_coverage: 2026-10-28` (the second day of the 27–28
+October 2026 meeting on the official meeting calendar, as already noted in the
+original transcription above). `run.py` accepts a sample only if coverage
+reaches the second session after the last price, or if the documented next
+scheduled announcement lies beyond it. This field was carried over from the
+original verified transcription, not re-fetched: the audit session's network
+policy blocked federalreserve.gov. It must be re-verified whenever coverage is
+extended. It is not a CSV row and never activates a signal by itself.

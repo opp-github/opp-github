@@ -1,193 +1,286 @@
 # Goldman Sachs Equity TimeX research framework
 
 A complete, executable Python research project implementing the supplied July 28,
-2023 Equity TimeX methodology, plus the requested simplified approximation.
-It downloads data, validates it, generates signals, runs quantity-based accounting,
-attributes costs, stress-tests the policy and exports figures and audit tables.
+2023 Equity TimeX methodology (Bloomberg ticker GSEQTMX) alongside a separately
+labelled simplified approximation. One script downloads and validates data,
+generates the five signals, runs volatility control and synthetic-quantity
+accounting, attributes costs, stress-tests the policy, checks the result against
+figures Goldman Sachs published, and exports charts, tables and an audit trail.
 
 **This is an independent research reconstruction, not verified official GSEQTMX
-performance.** Official daily index levels were not available in the supplied
-documents. A ten-year study also precedes the methodology's declared 2021 base
-dates. An optional official-level reconciliation is implemented; exact agreement
-should only be claimed after that check and any residual differences are resolved.
+performance.** Official daily index levels were not available. The ten-year
+study also starts before the methodology's 2021 base dates. An optional
+official-level reconciliation is implemented. Claim exact agreement only after
+running that check and explaining any residual differences.
+
+The project was independently audited on 2026-10-08. See
+[`AUDIT_FINDINGS.md`](AUDIT_FINDINGS.md) for the findings register, the
+independent re-implementation, and every change from the received version. No
+formula or timing error was found, and all reference results are unchanged.
 
 ## Quick start
 
-Python 3.12 or later. From this directory:
+Python 3.12 or 3.13. From this directory:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-python run.py --offline --end 2026-10-08
-python -m pytest -q
+python -m pip install -r requirements-lock.txt   # exact environment; requirements.txt pins direct deps only
+python run.py --offline                          # frozen snapshot; end date 2026-10-08 read from its manifest
+python -m pytest -q                              # 70 offline tests
 ```
 
-The offline command reproduces the delivered snapshot. For the complete pinned transitive dependency snapshot, install `requirements-lock.txt` instead of `requirements.txt`. The executed validation suite passes **40 tests**. For a fresh data download:
+`python run.py --offline --end 2026-10-08` is equivalent. The offline run
+reproduces the delivered `results/` byte for byte, except the timestamp in
+`run_manifest.json`.
+
+**Fresh download.** Yahoo's end date is exclusive.
 
 ```bash
-python run.py --end 2026-10-08
+python run.py --end 2026-10-08                   # writes data_fresh/, never data/
 ```
 
-The Yahoo end date is exclusive. The executed comparison is **7 October 2016 to
-7 October 2026**, with 2014 onward data for warmup. A custom comparison anchor:
+A fresh download goes to `data_fresh/` and is compared with the frozen snapshot
+in `results/data_revisions.json`, so vendor restatements are disclosed rather
+than absorbed. Downloading over the frozen `data/` is refused unless you pass
+`--overwrite-inputs`. The fresh-download path was **not executed during the
+audit**: the session's network policy blocked Yahoo, FRED and the Fed. It is
+covered by offline tests with mocked providers.
+
+**Custom comparison anchor** (at least 252 warm-up sessions are required):
 
 ```bash
-python run.py --offline --start 2020-01-02 --end 2026-10-08 --output-dir results_2020
+python run.py --offline --start 2020-01-02 --output-dir results_2020
 ```
 
-The checked-in FOMC calendar is verified through 8 October 2026. Future runs fail
-if price data exceed calendar coverage: extend the calendar using verified Fed
-sources and update the coverage JSON explicitly. The calendar builder reproduces
-the verified transcription; it does not scrape a future calendar automatically.
-
-For official verification, supply a locally licensed CSV with columns `date,level`:
+**Optional official reconciliation.** Supply a locally licensed CSV of
+published levels with columns `date,level`:
 
 ```bash
-python run.py --offline --end 2026-10-08 --official-levels data/official_gseqtmx.csv
+python run.py --offline --official-levels data/official_gseqtmx.csv
 ```
 
-The command writes rebased level residuals, daily return bias, annualized tracking
-error and separate pre-launch/live-period tracking errors when sufficient data exist.
-The input is optional because no official daily series was supplied; there is no
-placeholder or invented official index dataset in this project.
+Duplicate, missing, nonnumeric, nonfinite and nonpositive levels are rejected.
+The reconciliation runs against two series: the inception-seeded
+reconstruction (base 100 on 1 June 2021) and the extended-history path. It
+reports:
+
+- daily return bias
+- annualized tracking error
+- maximum rebased level error
+- pre-launch and live subsets
+- the number of official dates not matched to a session
+- for the inception path, a level-for-level comparison after rounding the
+  reconstruction like the published index (2 dp, 0.005 rounded up)
+
+Publication rounding alone produces about 0.06% annualized tracking error and up
+to 0.005 of level error. Residuals of that size cannot be distinguished from
+rounding. No official dataset is included or invented.
+
+The checked-in FOMC calendar is verified through 8 October 2026. A run fails
+if prices extend beyond that coverage. It also fails unless the scheduled
+calendar is certified for two sessions after the last price, which the final
+FOMC decision needs. To extend coverage, add entries from verified Fed sources
+in `data/build_fomc_calendar.py` and regenerate. The builder reproduces a
+verified transcription; it does not scrape future calendars.
 
 ## Source hierarchy and model distinction
 
-The supplied methodology is authoritative for the methodology-based path. The
-brochure explains the product but does not replace its detailed formulas. The
-documents' legal or operational text is treated as source content, not instructions
-to the coding agent. The extracted methodology is audited in `methodology_audit.md`.
+The supplied methodology governs the methodology-based path. The brochure
+explains the product but does not replace its formulas. Where they differ
+(see "Brochure versus methodology" in [`methodology_audit.md`](methodology_audit.md)), the formula is
+used. The documents' legal or operational text is treated as source content,
+not as instructions.
 
-| Mechanism | Supplied official methodology | Requested approximation |
+| Mechanism | A. Methodology research reconstruction | B. Requested simplified approximation |
 |---|---|---|
-| Equity return | SPY Close plus cash dividends | SPY Close only, forfeiting dividends |
-| Cash subtraction | Fed Funds, applied to equity notional | Converted 3-month T-bill yield proxy |
-| Month signals | Conditional last-four-return-day MR; first-four-return-day long | Final 2 / first 3 trading-day flags exported |
-| FOMC | Scheduled-only; close decisions at announcement minus 2 and minus 1 sessions | Actual announcement mask exported |
-| OpEx | Holiday-adjusted third Friday; directional signal before expiry | Expiry-date flag exported |
-| Additional signal | Five-day weighted mean reversion with 10-day vol scalar | Not added to the requested simple target formula |
-| Volatility | Maximum of .94 and .97 EWMAs on signal-allocated ER portfolio | Maximum of 20/60-day SPY rolling sample vol |
-| Allocation | 75% base + five signals, 0–150% range, 75pp daily change cap | Direct 10% / prior-day vol target |
-| Final exposure | 150% cap and 50pp daily change cap | 0–150% direct weight cap |
+| Equity return | SPY Close plus cash dividends (ex-date) | SPY Close only, dividends excluded |
+| Cash subtraction | Fed Funds (FRED DFF proxy) on equity notional | 3-month T-bill (DTB3, converted to money-market yield) |
+| Month signals | ToM mean reversion (EOM−4…EOM−1, vs EOM−5) and ToM long (EOM, BOM…BOM+2) | Final 2 / first 3 trading-day flags exported as diagnostics |
+| FOMC | Scheduled-only; decisions at announcement −2 and −1 sessions | Announcement-date mask exported |
+| OpEx | Holiday-adjusted third Friday; momentum sign on OE−3…OE−1 | Expiry-date mask exported |
+| Fifth signal | Short-term mean reversion with a 10-day RMS vol scalar | Not part of the requested formula |
+| Volatility | Max of 0.94 / 0.97 EWMAs of the signal-allocated ER portfolio | Max of 20/60-day SPY rolling sample vol |
+| Allocation | 75% base + signals; 0–150%; ±75pp per day | Direct 10% / prior-day vol |
+| Final exposure | Target = VC(t−1) × allocation; 150% cap; ±50pp per day | Clipped to 0–150% |
 | Servicing | 0.50% p.a. on equity notional | Flat 0.50% p.a. on NAV |
-| Rebalancing | 1bp on absolute synthetic quantity turnover | 1bp on absolute weight change |
-| Index deduction | 0.50% p.a. on previous net NAV | Same rate, flat NAV |
+| Rebalancing | 1bp on \|Δ synthetic quantity\| × asset level | 1bp on \|Δ target weight\| |
+| Index deduction | 0.50% p.a. on prior net NAV | Same rate, flat NAV |
 | Day count | Actual/360 | Actual/360 |
 
-The simple model implements the specified daily targeting formula. Its event
-flags are diagnostics; there is no undocumented event multiplier. The exact
-methodology path uses all five actual signals.
+The simplified model implements the requested daily targeting formula. Its
+event flags are diagnostics only; no undocumented event multiplier is added. It
+is never labelled as the index.
 
 ## Causality and accounting
 
-Every `weight_close[t]` is a decision at close t and earns the next session's
-return. `weight_held[t]` is the preceding decision. The official volatility scalar
-uses algorithmic volatility at t-1 when selecting the t-close lookthrough weight,
-as stated in section 7. Signals using prices never access a future close.
-Calendar windows use a padded, complete exchange calendar, so a truncated month
-cannot be mistaken for month-end. Holiday OpEx shifts to the preceding session.
-
-Section 11 asset return is:
+`weight_close[t]` is a decision at close t that earns the next session's
+return; `weight_held[t]` is the preceding decision. The volatility scalar uses
+algorithmic volatility through t−1 to select the t-close weight (methodology
+section 7). A shock therefore enters the exposure decision one close after it
+occurs. No signal reads a future close. Calendar windows use a padded exchange
+calendar, so a truncated month cannot be mistaken for month-end. A
+holiday-affected expiry moves to the preceding session (for example, Good
+Friday).
 
 ```text
 asset_ER_return[t] = (Close[t] + Dividend[t]) / Close[t-1] - 1
-                     - FedFunds[t-1] * elapsed_calendar_days / 360
-```
+                     - FedFunds[t-1] * calendar_days / 360
 
-Dividends are included once. Excess return means financing is subtracted;
-it does not mean the dividend yield is discarded. The adjusted-close SPY TR
-benchmark remains separate from the cash-dividend convention.
-
-The synthetic quantity ledger implements sections 2–6 literally:
-
-```text
 Gross[t] = Net[t-1] + Q[t-1] * (AssetER[t] - AssetER[t-1])
-Q[t]     = Gross[t] * LookthroughWeight[t] / AssetER[t]
+Q[t]     = Gross[t] * W[t] / AssetER[t]
 RC[t]    = abs(Q[t] - Q[t-1]) * AssetER[t] * 0.0001
-SC[t]    = Q[t-1] * AssetER[t-1] * day_count_fraction[t] * 0.005
-DC[t]    = Net[t-1] * day_count_fraction[t] * 0.005
-Net[t]   = max(0, Gross[t] - RC[t] - SC[t] - DC[t])
+SC[t]    = Q[t-1] * AssetER[t-1] * days/360 * 0.005
+DC[t]    = Net[t-1] * days/360 * 0.005
+Net[t]   = max(0, Gross[t] - RC[t] - SC[t] - DC[t])      # zero is absorbing
 ```
 
-Zero is absorbing. Quantity is selected using gross NAV before cost deductions.
-Consequently the official capped weight is gross-normalized; realized notional
-divided by net NAV may be slightly greater than 150% after fees. Both conventions
-are exposed in the daily ledger. Benchmark incremental fee drag is zero; embedded
-SPY expenses remain in the vendor prices and are not subtracted a second time.
+Dividends are included once. Excess return means financing is subtracted, not
+that dividends are forfeited. Quantity is chosen on gross NAV, so exposure
+relative to net NAV can slightly exceed 150% (maximum observed: 150.02%).
+Quantity changes even at constant target weight, because drift and prior
+charges move gross NAV.
 
-The ten-year accounting comparison resets all portfolios to 100 with identical
-initial policy weights at the anchor, avoiding contamination from pre-period fees.
-Signal/vol states use the longer warmup. `official_inception_daily.csv` separately
-resets the published volatility seeds on 3 May 2021 and initializes index NAV and
-quantity on 1 June 2021. This dataset is an inception-rule reconstruction too,
-not official observations.
+Every accounting path in the ten-year comparison is reset to 100 with the same
+policy holdings at the anchor, 7 October 2016. Signal and volatility states use
+697 earlier warm-up sessions. `official_inception_daily.csv` separately resets
+the published volatility seeds on 3 May 2021 and NAV and quantity on 1 June
+2021. By 2026 it differs from the extended path by 0.0002 per 100, so the
+initialization has been forgotten.
 
 ## Attribution and statistics
 
-The sequential bridge starts with SPY adjusted TR, isolates its difference from
-explicit cash-dividend TR, then adds signal allocation, volatility control,
-financing, servicing, transactions and index deduction. Terminal wealth changes
-sum to the full benchmark-to-index difference. Non-fee sequential attribution is
-order dependent and is labeled as such.
+- **Sequential bridge.** It runs from SPY adjusted TR to explicit cash-dividend
+  TR, then signal allocation, volatility control and caps, Fed Funds excess
+  return, servicing, rebalancing and index deduction. It telescopes exactly but
+  is **order dependent**.
+- **Direct counterfactuals.** Financing, dividend forfeiture and fees hold the
+  baseline exposure policy fixed.
+- **Shapley split.** The three explicit costs are split over all eight fee
+  coalitions, so the split does not depend on ordering.
+- **Sensitivities.** These recompute the full policy for each case.
+- **Fee measures.** `fee_drag_measures.csv` keeps four measures apart: the sum
+  of nominal daily charges, compounded terminal wealth lost, relative
+  terminal-wealth loss, and CAGR reduction in percentage points.
 
-All direct drag counterfactuals keep baseline close weights fixed. This isolates
-economics instead of mixing a fee/funding change with a different exposure policy.
-The three explicit costs also use all eight fee coalitions to produce
-order-independent Shapley attribution, including compounding and gross/net effects.
-Sensitivity scenarios recompute the entire policy separately to capture feedback.
+| Metric | Convention |
+|---|---|
+| CAGR | Elapsed calendar years (365.25 days per year) |
+| Volatility | Daily sample standard deviation × √252 |
+| Sharpe | Comparator is zero for the excess-return index; SPY returns subtract the same DFF accrual once |
+| Maximum drawdown | Includes the starting value |
+| Cumulative fee drag | `1 − net / no-fee terminal wealth` |
 
-`Cumulative Fee Drag` is `1 - net_terminal_wealth / nofee_terminal_wealth`.
-It is a percentage of no-fee terminal wealth, not percentage points of CAGR and
-not the sum of daily charges. The ledger reports nominal charges separately;
-the Shapley table reports lost terminal wealth per initial 100.
+## Results snapshot (frozen data, 7 Oct 2016 – 7 Oct 2026)
 
-CAGR uses elapsed calendar years (365.25 days). Annualized volatility uses
-daily sample standard deviation times sqrt(252). Sharpe uses daily mean excess
-return / daily excess-return standard deviation times sqrt(252). The index return
-is already excess, so its cash comparator is zero; SPY benchmarks subtract the
-same DFF cash accrual. Maximum drawdown includes the initial 100 anchor.
+| | CAGR | Vol | Sharpe | Max DD | Wealth per 100 |
+|---|---:|---:|---:|---:|---:|
+| TimeX research reconstruction | 6.75% | 10.04% | 0.703 | −19.32% | 192.08 |
+| SPY Price Return | 13.71% | 18.01% | 0.668 | −34.10% | 361.43 |
+| SPY Total Return | 15.52% | 17.95% | 0.758 | −33.72% | 423.22 |
+| Requested simplified approximation (not the index) | 5.72% | 9.74% | 0.621 | −16.26% | 174.32 |
+
+**Consistency with GS-published figures.** These are GS backtest figures built
+on GS data, not official daily levels.
+
+| Figure | Published | Reconstruction |
+|---|---:|---:|
+| 0.94 EWMA on the asset base date | 12.0433% | 12.0433% |
+| 0.97 EWMA on the asset base date | 14.6234% | 14.6207% |
+| 5Y annualized return to 28 Jul 2023 | 6.02% | 6.07% |
+| 3Y annualized return | 5.32% | 5.22% |
+| 1Y return | 2.15% | 2.52% |
+| Rolling-1Y servicing + rebalancing, average | ~0.61% | 0.64% |
+| Rolling-1Y servicing + rebalancing, high | ~0.92% | 0.93% |
+
+The convention fingerprint shows the anchors contradict four readings:
+
+- dividend forfeiture
+- the brochure's EOM−4 wording
+- volatility measured on unallocated SPY
+- servicing charged on NAV
+
+They cannot distinguish DTB3 from DFF funding.
 
 ## Outputs
 
 | File under `results/` | Purpose |
 |---|---|
-| `timex_dashboard.png`, `.svg` | Required log equity comparison and dual-axis exposure/market-volatility panel |
-| `drag_attribution.png` | Sequential economics and three-cost Shapley attribution |
-| `performance_summary.csv` | All three requested paths and performance/fee metrics |
-| `equity_curves.csv` | Identically rebased daily comparison paths |
-| `daily_audit_ledger.csv` | Input prices/actions/rates, masks, signal weights, volatility states, quantities and daily charges |
-| `drag_attribution.csv`, `counterfactual_curves.csv` | Telescoping wealth attribution and daily counterfactual paths |
-| `cost_shapley.csv` | Order-independent explicit cost attribution |
-| `historical_stress.csv` | COVID selloff/rebound, 2022 tightening, April 2025 selloff |
-| `synthetic_stress.csv` | Seeded -20% gap, crash/rebound and low-volatility chop |
-| `parameter_sensitivity.csv` | Target/cap/EWMA/signal/funding and March 2020 calendar sensitivity |
-| `requested_approximation_daily.csv`, `_summary.csv` | Requested simplified model and masks, separately labeled |
-| `official_inception_daily.csv` | Published initialization conventions, from index base date |
-| `run_manifest.json`, `diagnostics.json` | Configuration, data ranges, hashes, software versions, limitations and accounting diagnostics |
-| `research_report.md` | Executed results, three interview insights and resume wording |
+| `timex_dashboard.png/.svg` | Required figure: (A) log equity curves; (B) held exposure (0–150%, left) against SPY 20-day realized volatility (right) |
+| `drag_attribution.png/.svg` | Order-dependent waterfall; nominal versus compounded (Shapley) costs |
+| `published_anchor_checks.png/.svg` | GS-published figures against the reconstruction and contradicted conventions |
+| `synthetic_gap.png/.svg` | Seeded −20% gap: level path and held exposure per session |
+| `performance_summary.csv` | The three comparison paths with performance and fee metrics |
+| `equity_curves.csv`, `counterfactual_curves.csv` | Daily paths rebased to the same anchor |
+| `daily_audit_ledger.csv` | Inputs, rates, masks, signals, EWMAs, weights, quantities and daily charges |
+| `drag_attribution.csv`, `cost_shapley.csv`, `fee_drag_measures.csv` | Attribution and the four fee measures |
+| `dividend_convention_audit.csv` | Per-ex-date cash versus vendor dividend treatment |
+| `historical_stress.csv`, `synthetic_stress.csv`, `synthetic_paths.csv` | Stress windows, synthetic scenarios, and their daily exposure paths |
+| `parameter_sensitivity.csv` | Target, cap, EWMA, signal, funding and 18 March 2020 calendar cases |
+| `published_anchor_checks.csv`, `convention_fingerprint.csv` | External consistency checks |
+| `requested_approximation_daily.csv`, `_summary.csv` | Simplified model and diagnostic masks |
+| `official_inception_daily.csv` | Reconstruction under the published initialization dates |
+| `run_manifest.json`, `diagnostics.json`, `validation.json` | Configuration, data bounds, input and output SHA256, versions, limitations, test record |
+| `research_report.md` | Executed results, three interview talking points, limitations, resume wording |
 
-Synthetic scenarios use seed 17 and are explicitly separated from downloaded
-historical observations. No synthetic input replaces historical market data.
+Synthetic scenarios use seed 17 and real 2019 session dates. They are labelled
+and never replace historical observations.
 
-## Reproducibility and audit limits
+## Validation and tests
 
-The frozen inputs are included under `data/`. The download manifest records
-provider links, retrieval timestamps and hashes; the run manifest hashes the actual
-input files and executed script. Network downloads retry at most three times and
-fail loudly. Missing trading sessions, missing actions, nonpositive/nonfinite
-prices, unhandled splits, future backfilling and cash rates stale by more than
-seven days all trigger errors. The project has substantive offline tests and a
-CI workflow; tests do not require Yahoo or FRED availability.
+Input validation fails loudly on:
 
-Remaining limits are material: XNYS is a holiday proxy for NYSE Arca; final-vintage
-Yahoo and FRED are not a point-in-time commercial feed; historical FOMC archives
-do not certify every publication/cancellation timestamp; official discretionary
-disruption, adjustment and restatement decisions are absent. In particular,
-cancelled 18 March 2020 is an explicit alternative calendar scenario. The supplied
-methodology is a July 2023 version; later amendments are not presumed absent.
+- missing or duplicate sessions, including late starts and early stops against
+  the requested window
+- nonfinite or nonpositive prices
+- negative dividends
+- splits
+- capital-gains distributions
+- missing, stale (more than 7 days) or implausible (outside −5%…25%) cash rates
+- backfilled rates
+- insufficient warm-up
+- FOMC coverage that is too short, including the two-session look-ahead
 
-Primary sources:
+The 70 offline tests cover:
+
+- signal windows, including fixtures that distinguish EOM−5 from EOM−4 and OE−4
+  from OE−3
+- Good Friday, decision versus held lag, and calendar truncation
+- the RMS scalar and its analytic bound
+- EWMAs on the allocated portfolio
+- both caps and the official seeds
+- ACT/360 accrual, quantity turnover and drift, and absorbing zero
+- common-anchor, Shapley and fee-measure reconciliation
+- causal rate alignment and rate units
+- snapshot protection and revision reporting
+- Sharpe and CAGR definitions, and official-reconciliation rounding
+- a frozen-snapshot regression against the reference numbers
+- the published-seed fingerprint
+- cross-checks against the independent implementation in
+  `audit/independent_reimplementation.py`
+
+CI (`.github/workflows/tests.yml`) installs the lock file on Python 3.12 and
+3.13, runs the tests, and runs the offline pipeline.
+
+## Limitations
+
+- The study extends before the 1 June 2021 index base date and the 28 July 2023
+  launch date.
+- Yahoo prices and actions and FRED final-vintage DFF and DTB3 are proxies for
+  the calculation agent's inputs. DTB3 is a bank-discount yield, converted
+  with a 91-day tenor.
+- XNYS is a holiday-calendar proxy for NYSE Arca, not an exact equivalent.
+- The FOMC archive gives final calendars, not point-in-time vendor schedules,
+  so the four-business-day rule cannot be certified historically. 18 March 2020
+  is run as a sensitivity.
+- Discretionary disruption, adjustment and restatement decisions are not
+  reproduced.
+- The methodology is the July 2023 version; later amendments are not presumed
+  absent.
+- An index reconstruction does not reproduce a structured note's participation
+  rate, caps, fees or issuer credit exposure.
+
+## Primary sources
 
 - [Goldman Sachs index methodology catalogue](https://www.goldmansachs.com/what-we-do/ficc-and-equities/products-and-business-groups/products/index-methodologies)
 - [Goldman Sachs GSEQTMX product page](https://www.goldmansachsindices.com/products/GSEQTMX)
@@ -196,6 +289,5 @@ Primary sources:
 - [FRED DTB3, discount basis](https://fred.stlouisfed.org/series/DTB3)
 - [yfinance download documentation](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html)
 
-Use the resume wording in the report. Avoid stating that this code is Goldman
-Sachs-certified or that any structured note's payoff is reproduced: product
-participation rates, caps, credit risk and contract terms are separate layers.
+Use the resume wording in `results/research_report.md`. Do not describe this
+code as Goldman Sachs-certified, or as reproducing any structured note's payoff.
