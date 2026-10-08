@@ -15,6 +15,13 @@ from datetime import date
 COVERAGE_START = "2014-01-01"
 COVERAGE_END = "2026-10-08"
 VERIFIED_AS_OF = "2026-10-08"
+# The FOMC decision at close T looks two sessions ahead, so a run whose last
+# price is near COVERAGE_END needs to know the next scheduled announcement after
+# it. This is the second day of the 27-28 October 2026 meeting on the official
+# Fed meeting calendar, as recorded in the original verified transcription; it
+# is a scheduled future date, not a realized event, and is NOT a CSV row.
+NEXT_SCHEDULED_AFTER_COVERAGE = "2026-10-28"
+NEXT_SCHEDULED_SOURCE = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 
 SCHEDULED = {
     2014: "01-29 03-19 04-30 06-18 07-30 09-17 10-29 12-17",
@@ -79,6 +86,8 @@ coverage = {
     "end": COVERAGE_END,
     "verified_as_of": VERIFIED_AS_OF,
     "point_in_time": False,
+    "next_scheduled_after_coverage": NEXT_SCHEDULED_AFTER_COVERAGE,
+    "next_scheduled_source": NEXT_SCHEDULED_SOURCE,
     "notes": [
         "Source-backed final historical Federal Reserve calendars, not a dated vendor schedule archive.",
         "Scheduled policy announcement dates use the second/final meeting day, not the first meeting day.",
@@ -87,6 +96,7 @@ coverage = {
         "2020-03-18 must be tested as a calendar sensitivity because its eligibility at the four-index-business-day cutoff is not certified.",
         "2026-10-28 and 2026-12-09 are future scheduled dates relative to this verification date and are not in the historical CSV.",
         "Verify and extend the data from official Fed sources before a run outside the stated coverage.",
+        "next_scheduled_after_coverage certifies the two-session FOMC look-ahead of the final price date; it must be re-verified whenever coverage is extended.",
     ],
 }
 path.with_name("fomc_coverage.json").write_text(

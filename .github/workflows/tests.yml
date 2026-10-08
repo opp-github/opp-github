@@ -3,12 +3,18 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install -r requirements.txt
+      # The lock file is the exact audited environment; requirements.txt pins only direct deps.
+      - run: python -m pip install -r requirements-lock.txt
       - run: python -m pytest -q
-      - run: python run.py --offline --end 2026-10-08
+      - run: python run.py --offline --output-dir ci_results
+      - run: python audit/independent_reimplementation.py data ci_results/daily_audit_ledger.csv
