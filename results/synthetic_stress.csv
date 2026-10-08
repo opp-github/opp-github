@@ -1,4 +1,4 @@
-Scenario,"Shock Date (synthetic, 2019 calendar)",Index Return,SPY Price Return,Maximum Drawdown,Exposure Before Shock,Exposure After Shock Close,First Shock Index Return,Minimum Subsequent Exposure,Sessions After Shock Until Exposure Below 50%
-Overnight -20% gap,2019-06-26,-0.265063154683,-0.2,-0.265063154683,1.31316974485,1.38460668337,-0.262824244092,0.0121458497502,2
-Crash then rapid rebound,2019-06-26,-0.14907406614,0.0232395159329,-0.184925870427,1.31316974485,1.40279697301,-0.0330160751127,0,6
-Low-volatility chop,2019-06-26,-0.00714584425987,-0.000319951364669,-0.0121545216572,1.31316974485,1.2666616543,0.00507030452349,0.00600846064915,34
+Scenario,"Shock Date (synthetic, 2019 calendar)",Index Return,SPY Price Return,Maximum Drawdown,Exposure Before Shock,Exposure After Shock Close,First Shock Index Return,Minimum Subsequent Exposure,First Session With Held Exposure Below 50%
+Overnight -20% gap,2019-06-26,-0.265063154683,-0.2,-0.265063154683,1.31316974485,1.38460668337,-0.262824244092,0.0121458497502,3
+Crash then rapid rebound,2019-06-26,-0.14907406614,0.0232395159329,-0.184925870427,1.31316974485,1.40279697301,-0.0330160751127,0,7
+Low-volatility chop,2019-06-26,-0.00714584425987,-0.000319951364669,-0.0121545216572,1.31316974485,1.2666616543,0.00507030452349,0.00600846064915,35

@@ -13,6 +13,9 @@
   "cash_vs_adjusted_total_return_max_daily_difference": 0.00025221368986486775,
   "max_final_weight_step": 0.5000000000000001,
   "max_allocation_step": 0.7500000000000001,
+  "first_price": "2014-01-02",
+  "seed_warmup_sessions": 1845,
+  "seed_residual_variance_weight_097": 3.925090921046159e-25,
   "short_mr_max_abs": 0.07011009502267611,
   "short_mr_theoretical_bound": 0.07386710503565987,
   "fomc_lookahead": {

@@ -157,4 +157,39 @@ def test_synthetic_gap_exposure_rises_before_stepwise_derisking(frozen):
     path = paths.loc[paths.Scenario == "Overnight -20% gap"].set_index("Session Relative To Shock")
     steps = path["Close Exposure"].diff().loc[1:]
     assert steps.min() >= -cfg.lookthrough_step - 1e-12
-    assert gap["Sessions After Shock Until Exposure Below 50%"] == 2
+    # Held basis: 131% (shock day), 138% (+1), 88% (+2), 38% (+3).
+    assert path.loc[2, "Held Exposure"] == pytest.approx(gap["Exposure After Shock Close"] - 0.5, abs=1e-12)
+    assert gap["First Session With Held Exposure Below 50%"] == 3
+
+
+def test_april_2025_is_shown_both_ways(frozen):
+    cfg, market, _, events, _, _ = frozen
+    historical, _, _ = timex.stress_analysis(market, events, cfg, pd.Timestamp("2016-10-07"))
+    rebound = historical.loc["April 2025 rebound"]
+    assert (rebound.Start, rebound.End) == ("2025-04-08", "2025-06-30")
+    assert rebound["Index Return"] == pytest.approx(0.0533, abs=5e-5)
+    assert rebound["SPY TR Return"] == pytest.approx(0.2481, abs=5e-5)
+
+
+def test_regime_breakdown_and_excess_return_benchmark(frozen):
+    """The blended CAGR hides regimes; the ER benchmark removes the cash rate."""
+    cfg, market, _, _, _, feat = frozen
+    anchor = pd.Timestamp("2016-10-07")
+    m, f = market.loc[anchor:], feat.loc[anchor:]
+    level = timex.accounting(m.asset_er_return, f.weight_close, m.dcf, cfg).net_level
+    benchmark = timex.normalize_path(timex.wealth(market.adj_return - market.cash_return), anchor)
+    stats = timex.performance(benchmark, market.cash_return, True)
+    assert stats["Annualized Return"] == pytest.approx(0.126967, abs=1e-6)
+    assert stats["Terminal Wealth per 100"] == pytest.approx(330.4009, abs=1e-4)
+    levels = pd.DataFrame({timex.INDEX_NAME: level,
+                           timex.TOTAL_NAME: timex.normalize_path(timex.wealth(market.adj_return), anchor),
+                           timex.ER_BENCHMARK_NAME: benchmark})
+    periods = timex.period_breakdown(levels, feat.weight_held.loc[anchor:], cfg)
+    assert list(periods.index) == ["Before index base date", "Index base date to launch", "Since launch"]
+    recon = periods[f"{timex.INDEX_NAME} CAGR"]
+    assert recon.round(4).tolist() == [0.1289, -0.0011, 0.0290]
+    assert periods[f"{timex.TOTAL_NAME} CAGR"].round(4).tolist() == [0.1759, 0.0566, 0.1957]
+    # Regime boundaries are shared closes, so the three legs compound to the whole.
+    total = np.prod([(1 + c) ** ((pd.Timestamp(r.End) - pd.Timestamp(r.Start)).days / 365.25)
+                     for c, (_, r) in zip(recon, periods.iterrows())])
+    assert total == pytest.approx(level.iloc[-1] / level.iloc[0], rel=1e-12)

@@ -46,6 +46,9 @@ INDEX_NAME = "TimeX research reconstruction"
 PRICE_NAME = "SPY Price Return"
 TOTAL_NAME = "SPY Total Return"
 SIMPLE_NAME = "Requested simplified approximation"
+# Like-for-like benchmark for an excess-return index: SPY total return less the
+# same Fed Funds accrual. Comparing CAGR with plain SPY TR mixes in the cash rate.
+ER_BENCHMARK_NAME = "SPY Total Return minus Fed Funds"
 
 # The frozen snapshot reproduces the reference results. Fresh downloads go to a
 # separate directory so they can never silently overwrite those inputs.
@@ -816,7 +819,8 @@ def dividend_convention_audit(market: pd.DataFrame, anchor: pd.Timestamp) -> tup
         (Close_t + D_t) / Close_(t-1) - 1.
     A multiplicative back-adjustment by (1 - D_t / Close_(t-1)) instead implies
         Close_t / (Close_(t-1) - D_t) - 1,
-    i.e. the dividend is reinvested at the prior close. The gap equals
+    i.e. the dividend is reinvested at the dividend-adjusted prior close
+    (Close_(t-1) - D_t). The gap equals
         D (Close_t - Close_(t-1) + D) / (Close_(t-1) (Close_(t-1) - D)),
     positive on up ex-dates and negative on down ex-dates. It is a reinvestment
     convention difference, not a fee, and is reported rather than absorbed.
@@ -855,7 +859,9 @@ def stress_analysis(market, events, cfg, anchor) -> tuple[pd.DataFrame, pd.DataF
     windows = {"COVID selloff": ("2020-02-19", "2020-03-23"),
                "COVID rebound": ("2020-03-23", "2020-08-31"),
                "2022 tightening": ("2021-12-31", "2022-12-30"),
-               "April 2025 selloff": ("2025-04-02", "2025-04-08")}
+               "April 2025 selloff": ("2025-04-02", "2025-04-08"),
+               # Rebound to quarter-end, so the 2025 episode is shown both ways as COVID is.
+               "April 2025 rebound": ("2025-04-08", "2025-06-30")}
     historical = []
     for label, (start, end) in windows.items():
         sample = market.loc[start:end]
@@ -896,7 +902,9 @@ def stress_analysis(market, events, cfg, anchor) -> tuple[pd.DataFrame, pd.DataF
         shock = begin + 1
         segment = l.net_level.iloc[begin:]
         benchmark = pd.Series(px, index=dates).iloc[begin:]
-        below = np.flatnonzero(f.weight_close.iloc[shock:].to_numpy() < 0.5)
+        # Held basis: exposure actually carried over each session (the prior close's weight),
+        # consistent with "Exposure Before Shock" and "Exposure After Shock Close".
+        below = np.flatnonzero(f.weight_held.iloc[shock:].to_numpy() < 0.5)
         synthetic.append({"Scenario": label, "Shock Date (synthetic, 2019 calendar)": str(dates[shock].date()),
                           "Index Return": segment.iloc[-1]/segment.iloc[0]-1,
                           "SPY Price Return": benchmark.iloc[-1]/benchmark.iloc[0]-1,
@@ -905,7 +913,7 @@ def stress_analysis(market, events, cfg, anchor) -> tuple[pd.DataFrame, pd.DataF
                           "Exposure After Shock Close": f.weight_close.iloc[shock],
                           "First Shock Index Return": l["return"].iloc[shock],
                           "Minimum Subsequent Exposure": f.weight_close.iloc[shock:].min(),
-                          "Sessions After Shock Until Exposure Below 50%": int(below[0]) if len(below) else np.nan})
+                          "First Session With Held Exposure Below 50%": int(below[0]) if len(below) else np.nan})
         steps = np.arange(len(dates)) - shock
         paths.append(pd.DataFrame({"Scenario": label, "Session Relative To Shock": steps, "Date": dates,
                                    "Underlying Return": r, "Underlying Level": px / px[begin] * 100,
@@ -953,6 +961,38 @@ def sensitivity_analysis(market, events, cfg, anchor) -> pd.DataFrame:
     table["Terminal Wealth Change vs Baseline"] = (table["Terminal Wealth per 100"]
                                                    - table.loc["Baseline", "Terminal Wealth per 100"])
     return table
+
+
+def period_breakdown(levels: pd.DataFrame, held: pd.Series, cfg: Config) -> pd.DataFrame:
+    """Split the comparison into the index's own regimes.
+
+    Before the index base date the series is a research extension; from the base
+    date to launch GS itself reports hypothetical levels; after launch GS
+    publishes live levels. Every row here is still this project's hypothetical
+    reconstruction. A blended ten-year CAGR hides how unevenly the return falls
+    across these regimes, so each is reported separately.
+    """
+    start, end = levels.index[0], levels.index[-1]
+    cuts = [(start, pd.Timestamp(cfg.index_base_date), "Before index base date"),
+            (pd.Timestamp(cfg.index_base_date), pd.Timestamp(cfg.launch_date), "Index base date to launch"),
+            (pd.Timestamp(cfg.launch_date), end, "Since launch")]
+    rows = []
+    for a, b, label in cuts:
+        a, b = max(a, start), min(b, end)
+        window = levels.loc[a:b]
+        if len(window) < 2 or a >= b:
+            continue
+        years = (window.index[-1] - window.index[0]).days / 365.25
+        row = {"Period": label, "Start": str(window.index[0].date()), "End": str(window.index[-1].date())}
+        for name in levels:
+            series = window[name]
+            row[f"{name} CAGR"] = (series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1
+        reconstruction = window[INDEX_NAME]
+        row["Reconstruction Volatility"] = reconstruction.pct_change(fill_method=None).std(ddof=1) * np.sqrt(252)
+        row["Reconstruction Maximum Drawdown"] = (reconstruction / reconstruction.cummax() - 1).min()
+        row["Mean Held Exposure"] = held.loc[window.index[1:]].mean()
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("Period")
 
 
 def anchor_metrics(feat: pd.DataFrame, ledger: pd.DataFrame) -> dict:
@@ -1164,7 +1204,7 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
     """Required two-panel dashboard plus attribution, anchor and gap-risk figures."""
     _chart_style()
     start, end = paths.index[0], paths.index[-1]
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10.5), sharex=True,
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12.5, 9.2), sharex=True,
                                    gridspec_kw={"height_ratios": [1.3, 1]}, layout="constrained")
     fig.suptitle("Goldman Sachs Equity TimeX methodology: independent research reconstruction",
                  x=0.01, ha="left", fontsize=17, fontweight="bold", color=INK)
@@ -1214,7 +1254,7 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
     _save(fig, output, "timex_dashboard", dpi=190)
 
     # Attribution: order-dependent bridge as a waterfall, plus nominal vs compounded costs.
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6.8), layout="constrained", gridspec_kw={"width_ratios": [1.45, 1]})
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6.2), layout="constrained", gridspec_kw={"width_ratios": [1.45, 1]})
     terminal = attribution["Terminal Wealth per 100"]
     steps = list(terminal.index)
     labels = [steps[0]] + [f"{s}" for s in steps[1:]] + ["TimeX reconstruction (net)"]
@@ -1244,8 +1284,8 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
     nominal = fee_measures.loc["Sum of nominal daily charges", names].astype(float).to_numpy()
     compounded = cost_shapley.iloc[:, 0].to_numpy()
     y = np.arange(len(names))
-    ax.barh(y - 0.15, nominal, height=0.26, color=MUTED, label="Sum of nominal daily charges")
-    ax.barh(y + 0.15, compounded, height=0.26, color=BLUE, label="Compounded wealth lost (Shapley)")
+    ax.barh(y - 0.15, nominal, height=0.26, color=MUTED, label="Nominal charges")
+    ax.barh(y + 0.15, compounded, height=0.26, color=BLUE, label="Compounded loss (Shapley)")
     for k in range(len(names)):
         ax.text(nominal[k] + 0.15, y[k] - 0.15, f"{nominal[k]:.2f}", va="center", fontsize=9.5, color=INK2)
         ax.text(compounded[k] + 0.15, y[k] + 0.15, f"{compounded[k]:.2f}", va="center", fontsize=9.5,
@@ -1263,7 +1303,7 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
 
     # Published-anchor consistency: GS-printed figures against the reconstruction.
     families = list(dict.fromkeys(anchors.Family))
-    fig, axes = plt.subplots(1, len(families), figsize=(16, 4.8), layout="constrained")
+    fig, axes = plt.subplots(1, len(families), figsize=(13.5, 5.0), layout="constrained")
     contradicted = fingerprint.loc[fingerprint.Verdict == "contradicted by published anchors"]
     decimals = {a.label: a.decimals for a in PUBLISHED_ANCHORS}
     units = {"Seed volatility": "% annualized", "Trailing return": "%", "Cost rate": "% per year"}
@@ -1273,8 +1313,10 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
         ticks = []
         for row, (label, item) in enumerate(block.iterrows()):
             d = decimals[label]
-            ticks.append(f"{label}\nGS {item['Published (%)']:.{d}f} | recon {item['Reconstruction (%)']:.{d}f}")
-            alt = contradicted[label].dropna().to_numpy()
+            ticks.append(f"{label.replace(', rolling', ',\nrolling')}\nGS {item['Published (%)']:.{d}f} | recon {item['Reconstruction (%)']:.{d}f}")
+            # Only conventions that THIS figure contradicts, so a cross always means a contradiction.
+            by_row = contradicted.loc[contradicted["Anchors Contradicting"].str.split("; ").apply(lambda xs: label in xs)]
+            alt = by_row[label].dropna().to_numpy()
             ax.plot(alt, np.full(len(alt), row), "x", color=MUTED, markersize=7, markeredgewidth=1.4, zorder=2)
             ax.plot(item["Published (%)"], row, "o", markersize=11, markerfacecolor=SURFACE,
                     markeredgecolor=INK, markeredgewidth=1.6, zorder=3)
@@ -1289,8 +1331,8 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
                         Line2D([], [], marker="o", linestyle="", color=BLUE, markersize=7,
                                label="Methodology reconstruction"),
                         Line2D([], [], marker="x", linestyle="", color=MUTED, markersize=7,
-                               label="Contradicted alternative conventions")],
-               loc="lower left", ncol=3, bbox_to_anchor=(0.01, -0.02), fontsize=9.5)
+                               label="Alternative convention that this figure contradicts")],
+               loc="outside lower left", ncol=3, fontsize=9.5)
     fig.suptitle("Consistency with figures published in the methodology and brochure (not official daily levels)",
                  x=0.01, ha="left", fontsize=14.5, fontweight="bold", color=INK)
     fig.get_layout_engine().set(h_pad=0.15)
@@ -1299,7 +1341,7 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
     # Gap risk: synthetic -20% overnight gap, exposure path through the double lag.
     gap = synthetic_paths.loc[synthetic_paths.Scenario == "Overnight -20% gap"]
     gap = gap.loc[gap["Session Relative To Shock"].between(-3, 8)]
-    fig, (left, right) = plt.subplots(1, 2, figsize=(15, 5.4), layout="constrained")
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12.5, 5.0), layout="constrained")
     for column, color, name in (("Underlying Level", ORANGE, "Synthetic underlying"),
                                 ("Index Level", BLUE, "TimeX policy on synthetic path")):
         left.plot(gap["Session Relative To Shock"], gap[column], color=color, linewidth=1.8, marker="o",
@@ -1324,9 +1366,10 @@ def make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, f
     right.set_xlabel("Sessions relative to the shock session")
     right.set_ylabel("Exposure held over the session, %")
     right.set_title("Exposure held over each session", loc="left")
-    right.text(0.98, 0.62, "The shock-day close uses volatility through t-1,\nso exposure rises for session +1;\n"
-               "afterwards each close can cut at most 50pp.", transform=right.transAxes, ha="right",
-               va="top", fontsize=9.5, color=INK2)
+    # Placed over sessions +4..+8, where exposure is low, so it never covers a bar or its label.
+    right.text(0.98, 0.62, "The shock-day close still uses\nvolatility through t-1, so exposure\nis not cut; mean reversion lifts it\n"
+               "for session +1. Each later close\ncan cut at most 50 points.", transform=right.transAxes,
+               ha="right", va="top", fontsize=9.5, color=INK2, linespacing=1.35)
     right.grid(axis="x", visible=False)
     fig.suptitle("Synthetic stress (seeded, not historical): -20% overnight gap after a quiet history",
                  x=0.01, ha="left", fontsize=14.5, fontweight="bold", color=INK)
@@ -1349,110 +1392,189 @@ def _md_table(frame: pd.DataFrame, formats: dict, index_label: str) -> list[str]
     return lines
 
 
+def _ceil(value: float, decimals: int) -> float:
+    """Round a maximum deviation UP, so 'within x' statements stay true."""
+    factor = 10 ** decimals
+    return np.ceil(abs(value) * factor) / factor
+
+
 def write_report(summary, simple_summary, direct, fee_measures, anchors, fingerprint, historical, synthetic,
-                 sensitivity, dividend_summary, diagnostics, output):
-    """Generate the research report from executed results, with defined estimands."""
+                 sensitivity, dividend_summary, diagnostics, output, periods=None, attribution=None,
+                 synthetic_paths=None):
+    """Generate the research report from executed results, with defined estimands.
+
+    Every statement is built from the run's own outputs. Wording follows a
+    research-disclosure standard: results are hypothetical, the reconstruction
+    is never called "the index", and each comparison states its basis.
+    """
     pct, pp = "{:.2%}", "{:+.4f}"
     gap = synthetic.loc["Overnight -20% gap"]
     lines = ["# Equity TimeX research results", "",
              f"Executed comparison: **{diagnostics['comparison_start']} to {diagnostics['comparison_end']}** "
              f"({diagnostics['comparison_observations']:,} daily returns after {diagnostics['warmup_observations']} "
              "warm-up sessions).", "",
-             "> **Status.** Independent research reconstruction of the Goldman Sachs Equity TimeX Index "
-             "(GSEQTMX) from the supplied methodology dated 28 July 2023. Official daily GSEQTMX levels were "
-             "not available, so these results are **not** verified official index performance. Before the "
-             "methodology's 2021 base dates the series is a research extension.", "",
+             "> **Status.** All results are hypothetical. They apply the published rules of the Goldman Sachs Equity "
+             "TimeX Index (GSEQTMX) methodology dated 28 July 2023 to historical data; no money was invested and no "
+             "trades were made. They are not official GSEQTMX levels and were not compared with official levels, so "
+             "nothing here is a track record. Before the 1 June 2021 index base date the series is a research "
+             "extension. Hypothetical and past results do not predict future returns. This is not investment advice "
+             "or an offer of any product, and the project is not affiliated with or endorsed by Goldman Sachs.", "",
              "## Performance", ""]
     lines += _md_table(summary, {"Annualized Return": pct, "Annualized Volatility": pct, "Sharpe Ratio": "{:.3f}",
                                  "Maximum Drawdown": pct, "Terminal Wealth per 100": "{:.2f}",
-                                 "Cumulative Fee Drag": pct}, "Strategy")
+                                 "Cumulative Fee Drag": pct}, "Series")
     lines += ["", "Conventions: CAGR uses elapsed calendar years (365.25 days); volatility is the daily sample "
-              "standard deviation times sqrt(252); maximum drawdown includes the starting value. The ER index "
-              "return is already an excess return, so its Sharpe ratio uses a zero comparator; SPY price and total "
-              "returns subtract the same DFF cash accrual. Cumulative fee drag is 1 - net terminal wealth / "
-              "no-explicit-fee terminal wealth under the same exposures. SPY's embedded fund expense is already in "
-              "its prices and is not charged again.", "",
-              f"The requested simplified approximation is a different model, not the index:", ""]
+              "standard deviation times sqrt(252); maximum drawdown includes the starting value. The reconstruction "
+              "is an excess return, so its Sharpe ratio uses a zero comparator; SPY price and total returns subtract "
+              "the same DFF cash accrual. Because the reconstruction is an excess return, the like-for-like CAGR "
+              f"comparison is {ER_BENCHMARK_NAME}, not SPY total return. Cumulative fee drag is 1 - net terminal "
+              "wealth / no-explicit-fee terminal wealth under the same exposures. SPY's embedded fund expense is "
+              "already in its prices and is not charged again.", ""]
+    if periods is not None and len(periods):
+        lines += ["### By regime", ""]
+        shown = periods.rename(columns={f"{INDEX_NAME} CAGR": "Reconstruction CAGR",
+                                        f"{TOTAL_NAME} CAGR": "SPY TR CAGR",
+                                        f"{ER_BENCHMARK_NAME} CAGR": "SPY TR minus FF CAGR"})
+        lines += _md_table(shown, {"Start": "{}", "End": "{}", "Reconstruction CAGR": pct, "SPY TR CAGR": pct,
+                                   "SPY TR minus FF CAGR": pct, "Reconstruction Volatility": pct,
+                                   "Reconstruction Maximum Drawdown": pct, "Mean Held Exposure": "{:.1%}"}, "Period")
+        lines += ["", "The ten-year CAGR blends three regimes. GS itself describes levels before the 28 July 2023 "
+                  "launch as hypothetical; every row here is this project's hypothetical reconstruction.", ""]
+    lines += ["The requested simplified approximation is a different model, not the index. It is the simpler rule "
+              "set proposed before the methodology was read: SPY price return without dividends, 20/60-day rolling "
+              "volatility, T-bill funding and flat fees on NAV.", ""]
     lines += _md_table(simple_summary, {"Annualized Return": pct, "Annualized Volatility": pct,
                                         "Sharpe Ratio": "{:.3f}", "Maximum Drawdown": pct,
                                         "Terminal Wealth per 100": "{:.2f}", "Cumulative Fee Drag": pct}, "Model")
+    tolerance = anchors.groupby("Family")["Fingerprint Tolerance (pp)"].first()
+    cost_sample = anchors.loc[anchors.Family == "Cost rate", "Reconstruction Sample"].iloc[0].split("windows ")[-1]
     lines += ["", "## Consistency with figures Goldman Sachs published", "",
-              "The methodology prints the EWMA volatilities used to initialize the index on 3 May 2021, and the "
-              "methodology and brochure print backtested returns and cost rates. These were produced by GS with "
-              "its own data, so they test the implemented conventions without certifying the series.", ""]
+              "The methodology prints the EWMA volatilities used to initialize the index on 3 May 2021 and backtested "
+              "cost rates; the brochure prints backtested 1-, 3- and 5-year returns. GS produced these with its own "
+              "data and states that its backtests may use slightly different data sources, approximations and "
+              "methodology, so they test the implemented conventions without certifying the series. The brochure's "
+              "since-2000 annualized return (7.24%) is not compared because the reconstruction's data start in 2014.", "",
+              f"No earlier EWMA state is published, so the reconstruction's EWMAs start on {diagnostics['first_price']} "
+              f"from the published 3 May 2021 values. After {diagnostics['seed_warmup_sessions']:,} sessions the starting "
+              f"variance carries a weight of {diagnostics['seed_residual_variance_weight_097']:.1e} or less, so the "
+              "3 May 2021 match does not come from the seed. Nothing is fitted to the published figures.", ""]
     lines += _md_table(anchors, {"Published (%)": "{:g}", "Reconstruction (%)": "{:.4f}",
                                  "Difference (pp)": pp}, "Anchor")
+    lines += ["", f"The cost rows compare different samples: GS's figures are approximate and cover 3 January 2000 to "
+              f"28 July 2023, while the reconstruction's rolling one-year windows end {cost_sample}.", ""]
     contradicted = fingerprint.loc[fingerprint.Verdict == "contradicted by published anchors"]
     indistinct = fingerprint.loc[fingerprint.Verdict == "not distinguishable at anchor precision"]
-    lines += ["", "Convention fingerprint (each row recomputes the full policy):", ""]
+    lines += ["Convention fingerprint (each row recomputes the full policy):", ""]
     lines += _md_table(fingerprint[["Anchors Contradicting", "Verdict"]],
                        {"Anchors Contradicting": "{}", "Verdict": "{}"}, "Convention")
     lines += ["", f"Contradicted: {', '.join(contradicted.index) or 'none'}. Not distinguishable at the printed "
-              f"precision: {', '.join(indistinct.index) or 'none'}. The flag rule (error above three times the "
-              "larger of the baseline's own family residual and the rounding half-unit) is a declared heuristic, "
-              "not a statistical test.", "",
+              f"precision: {', '.join(indistinct.index) or 'none'}. A convention is flagged when its error exceeds "
+              "three times the larger of the baseline's own largest error in that family of figures and the printed "
+              "rounding half-unit. Trailing returns are compared as cumulative returns over each window, not as the "
+              "annualized figures in the table, so the thresholds are "
+              + "; ".join(f"{fam.lower()} {tol:.3g} pp" for fam, tol in tolerance.items())
+              + ". The rule is a declared heuristic, not a statistical test, and the verdicts assume GS's backtests "
+              "follow the methodology.", "",
               "## Fee and financing economics", ""]
     lines += _md_table(fee_measures, {"Unit": "{}", "Total": "{:.4f}", "Index deduction": "{:.4f}",
                                       "Servicing": "{:.4f}", "Rebalancing": "{:.4f}"}, "Measure")
+    bridge_financing = (-attribution.loc["Fed Funds excess return", "Incremental Impact per 100"]
+                        if attribution is not None else np.nan)
+    signal_step = attribution.loc["Signal allocation", "Incremental Impact per 100"] if attribution is not None else np.nan
+    base, plain = sensitivity.loc["Baseline"], sensitivity.loc["No calendar / MR signals"]
     lines += ["", "These measures have different denominators and are not interchangeable. Removed capital "
               "cannot compound, so compounded terminal wealth lost exceeds the sum of nominal charges. The Shapley "
-              "split averages all six orderings of the three costs and sums exactly to the total.", "",
-              f"Direct fixed-exposure counterfactuals: Fed Funds financing costs "
-              f"**{direct['financing_terminal_loss_per_100']:.2f}** per initial 100; a hypothetical forfeiture of "
-              f"dividends would cost a further **{direct['dividend_forfeit_terminal_loss_per_100']:.2f}**. The "
-              f"sequential bridge reconciles to **{direct['attribution_reconciliation_error']:.1e}** (floating-point "
-              "noise).", "",
+              "split averages all six orderings of the three costs and sums exactly to the total; rounded components "
+              "may not add to the rounded total.", "",
+              f"Financing: with all fees charged and exposures fixed, removing Fed Funds financing would add "
+              f"**{direct['financing_terminal_loss_per_100']:.2f}** per initial 100. The sequential bridge shows "
+              f"{bridge_financing:.2f} because it removes financing before any fees. A hypothetical forfeiture of "
+              f"dividends would cost a further **{direct['dividend_forfeit_terminal_loss_per_100']:.2f}**. The bridge "
+              f"reconciles to **{direct['attribution_reconciliation_error']:.1e}** (floating-point noise).", "",
+              f"Signals: the bridge's signal step (+{signal_step:.1f}) is measured before volatility control and "
+              "financing. With the full policy recomputed, removing all five signals (a plain 10% volatility target) "
+              f"changes terminal wealth from {base['Terminal Wealth per 100']:.2f} to "
+              f"{plain['Terminal Wealth per 100']:.2f} and the maximum drawdown from {base['Maximum Drawdown']:.2%} to "
+              f"{plain['Maximum Drawdown']:.2%}. "
+              + ("Over this sample the signals did not add value after volatility control."
+                 if plain["Terminal Wealth per 100"] > base["Terminal Wealth per 100"]
+                 else "Over this sample the signals added value after volatility control."), "",
               "## Three interview talking points", ""]
     close_only = fingerprint.loc["Dividends forfeited (Close-only ER)"]
-    base = fingerprint.loc["Methodology baseline"]
+    base_fp = fingerprint.loc["Methodology baseline"]
     lines += ["1. **Excess return keeps dividends; financing and dividend forfeiture are separate mechanisms.** "
               "Methodology section 11 adds the cash dividend to the price return and subtracts Fed Funds on the "
-              f"equity notional. At fixed exposures financing costs **{direct['financing_terminal_loss_per_100']:.2f}** "
-              f"per initial 100, while forfeiting dividends would cost **{direct['dividend_forfeit_terminal_loss_per_100']:.2f}**. "
-              "GS's own published numbers support the dividend-inclusive reading. The reconstructed 0.94 EWMA on "
-              f"3 May 2021 is **{base['0.94 EWMA vol, 3 May 2021']:.4f}%** against the printed 12.0433%. A Close-only ER "
-              f"gives {close_only['0.94 EWMA vol, 3 May 2021']:.4f}%, and its 5Y annualized return "
-              f"({close_only['5Y annualized return']:.2f}%) misses the brochure's 6.02% by about a point a year; "
-              f"the methodology path gives {base['5Y annualized return']:.2f}%.", ""]
+              f"equity notional. At fixed exposures with fees charged, financing costs "
+              f"**{direct['financing_terminal_loss_per_100']:.2f}** per initial 100, while forfeiting dividends would cost "
+              f"**{direct['dividend_forfeit_terminal_loss_per_100']:.2f}**. GS's own published numbers support the "
+              f"dividend-inclusive reading: the reconstructed 0.94 EWMA on 3 May 2021 is "
+              f"**{base_fp['0.94 EWMA vol, 3 May 2021']:.4f}%** against the printed 12.0433%, while a Close-only excess "
+              f"return gives {close_only['0.94 EWMA vol, 3 May 2021']:.4f}% and a five-year annualized return of "
+              f"{close_only['5Y annualized return']:.2f}% against the brochure's 6.02% "
+              f"(methodology path: {base_fp['5Y annualized return']:.2f}%).", ""]
     if "COVID rebound" in historical.index:
         row = historical.loc["COVID rebound"]
-        lines.append("2. **Volatility control lags the recovery.** From "
-                     f"{row['Start']} to {row['End']} the reconstruction returned **{row['Index Return']:.2%}** "
-                     f"against **{row['SPY TR Return']:.2%}** for SPY TR, with mean held exposure of "
-                     f"**{row['Mean Held Exposure']:.1%}**. Taking the maximum of the 0.94 and 0.97 EWMAs de-risks "
-                     "quickly and re-risks only as the slower estimate decays. This is evidence about this interval, "
-                     "not proof of future underperformance.")
+        text = ("2. **Volatility control lags the recovery.** From "
+                f"{row['Start']} to {row['End']} the reconstruction returned **{row['Index Return']:.2%}** "
+                f"against **{row['SPY TR Return']:.2%}** for SPY TR, with mean held exposure of "
+                f"**{row['Mean Held Exposure']:.1%}**. ")
+        if "April 2025 rebound" in historical.index:
+            rebound = historical.loc["April 2025 rebound"]
+            text += (f"The April 2025 rebound repeats the pattern: {rebound['Index Return']:.2%} against "
+                     f"{rebound['SPY TR Return']:.2%}, at {rebound['Mean Held Exposure']:.1%} mean exposure. ")
+        text += ("Taking the larger of the 0.94 and 0.97 EWMAs cuts risk quickly and restores it only as the slower "
+                 "estimate decays. These are specific intervals, not proof of future underperformance.")
+        lines.append(text)
+    held_two = np.nan
+    if synthetic_paths is not None:
+        path = synthetic_paths.loc[synthetic_paths.Scenario == "Overnight -20% gap"].set_index("Session Relative To Shock")
+        held_two = path.loc[2, "Held Exposure"] if 2 in path.index else np.nan
+    first_below = gap["First Session With Held Exposure Below 50%"]
     lines += ["", "3. **A 10% volatility target is not a loss limit, and the timing makes gaps worse.** In the "
-              f"seeded synthetic -20% overnight gap the index held **{gap['Exposure Before Shock']:.1%}** exposure "
-              f"and lost **{abs(gap['First Shock Index Return']):.2%}** on the shock day. The weight chosen at that "
-              "close uses volatility through the previous day (VC at t-1), so the shock has not yet entered the "
-              f"estimate. Exposure for the next session *rose* to **{gap['Exposure After Shock Close']:.1%}**, helped "
-              "by the mean-reversion signal. After that the 50pp daily limit allowed only stepwise de-risking: "
-              + (f"exposure first fell below 50% {int(gap['Sessions After Shock Until Exposure Below 50%'])} sessions "
-                 "after the shock." if np.isfinite(gap["Sessions After Shock Until Exposure Below 50%"])
-                 else "exposure never fell below 50% within the scenario.")
-              + (" A continuation shock on the next day would have hit at above 100% exposure."
+              f"seeded synthetic -20% overnight gap the reconstructed policy held **{gap['Exposure Before Shock']:.1%}** "
+              f"exposure and lost **{abs(gap['First Shock Index Return']):.2%}** on the shock day. The weight set at that "
+              "close still uses volatility through the previous day, so the shock had not entered the estimate and "
+              "exposure was not cut; the short-term mean-reversion signal, leaning against the fall, lifted held "
+              f"exposure for the next session to **{gap['Exposure After Shock Close']:.1%}**. After that the 50-point "
+              "daily limit allowed only stepwise de-risking"
+              + (f": held exposure was {held_two:.1%} in the second session after the shock" if np.isfinite(held_two) else "")
+              + (f" and first fell below 50% in session +{int(first_below)}." if np.isfinite(first_below)
+                 else " and never fell below 50% within the scenario.")
+              + (" A second shock the next day would have hit at above 100% exposure."
                  if gap["Exposure After Shock Close"] > 1 else ""), "",
-              "## Stress and sensitivity", "", "Historical windows (close to close):", ""]
-    lines += _md_table(historical, {"Index Return": pct, "SPY TR Return": pct, "Index Maximum Drawdown": pct,
-                                    "Mean Held Exposure": "{:.1%}", "Minimum Held Exposure": "{:.1%}"}, "Window")
+              "## Stress and sensitivity", "", "Historical windows (close to close; reconstruction figures are hypothetical):", ""]
+    hist_shown = historical.rename(columns={"Index Return": "Reconstruction Return",
+                                            "Index Maximum Drawdown": "Reconstruction Max Drawdown"})
+    lines += _md_table(hist_shown, {"Reconstruction Return": pct, "SPY TR Return": pct,
+                                    "Reconstruction Max Drawdown": pct, "Mean Held Exposure": "{:.1%}",
+                                    "Minimum Held Exposure": "{:.1%}"}, "Window")
     lines += ["", "Synthetic scenarios (seed 17, 120-session quiet history, real 2019 session dates; synthetic "
-              "results never replace historical data):", ""]
-    lines += _md_table(synthetic, {"Index Return": pct, "SPY Price Return": pct, "Maximum Drawdown": pct,
-                                   "Exposure Before Shock": "{:.1%}", "Exposure After Shock Close": "{:.1%}",
-                                   "First Shock Index Return": pct}, "Scenario")
-    lines += ["", "Parameter and policy sensitivities (full policy recomputed for each row):", ""]
+              "results never replace historical data). Returns and drawdowns run from the close before the shock "
+              "through 39 sessions after it; the crash scenario is ten -2.5% days followed by ten +2.8% days.", ""]
+    syn_shown = synthetic.rename(columns={"Index Return": "Reconstruction Return", "SPY Price Return": "Underlying Return",
+                                          "Maximum Drawdown": "Reconstruction Max Drawdown",
+                                          "First Shock Index Return": "First Shock-Day Return"})
+    lines += _md_table(syn_shown, {"Reconstruction Return": pct, "Underlying Return": pct,
+                                   "Reconstruction Max Drawdown": pct, "Exposure Before Shock": "{:.1%}",
+                                   "Exposure After Shock Close": "{:.1%}", "First Shock-Day Return": pct}, "Scenario")
+    lines += ["", "Parameter and policy sensitivities (full policy recomputed for each row). The baseline excludes "
+              "18 March 2020, the announcement date of a scheduled meeting cancelled in mid-March 2020; the "
+              "methodology disqualifies only meetings cancelled at least four index business days ahead, and the move "
+              "was decided on 12 March but announced on 15 March, so its row includes the date.", ""]
     lines += _md_table(sensitivity, {"Annualized Return": pct, "Annualized Volatility": pct,
                                      "Sharpe Ratio": "{:.3f}", "Maximum Drawdown": pct,
                                      "Terminal Wealth per 100": "{:.2f}", "Mean Held Exposure": "{:.1%}"}, "Scenario")
+    returns_gap = max(abs(anchors.loc[a.label, "Difference (pp)"]) for a in PUBLISHED_ANCHORS if a.years)
+    seed97_gap = abs(anchors.loc["0.97 EWMA vol, 3 May 2021", "Difference (pp)"])
     lines += ["", "## Data and convention checks", "",
               f"- **Dividend convention.** Explicit cash-dividend TR wealth is "
               f"{dividend_summary['cash_dividend_tr_wealth']:.4f} against Yahoo Adj Close "
               f"{dividend_summary['vendor_adj_close_tr_wealth']:.4f} ({dividend_summary['relative_difference']:.4%}). "
               f"Yahoo's ex-date return equals Close_t / (Close_t-1 - D) - 1 to within "
-              f"{dividend_summary['max_abs_vendor_minus_identity_bp']:.3f} bp, which is reinvestment at the prior close. "
-              f"That convention explains {dividend_summary['share_of_gap_explained_by_reinvestment_convention']:.2%} of the "
-              f"gap. The largest daily difference is {dividend_summary['max_abs_daily_cash_minus_vendor_bp']:.4f} bp on "
+              f"{_ceil(dividend_summary['max_abs_vendor_minus_identity_bp'], 4):.4f} bp, which is reinvestment at the "
+              "dividend-adjusted prior close (prior close minus the dividend). That convention explains "
+              f"{dividend_summary['share_of_gap_explained_by_reinvestment_convention']:.2%} of the gap. The largest daily "
+              f"difference is {dividend_summary['max_abs_daily_cash_minus_vendor_bp']:.4f} bp on "
               f"{dividend_summary['max_abs_daily_difference_date']}.",
               f"- **Short-term mean-reversion cap.** The ±10% clip never binds in this sample (maximum |signal| "
               f"{diagnostics['short_mr_max_abs']:.2%}). By Cauchy-Schwarz the signal is bounded near "
@@ -1461,27 +1583,37 @@ def write_report(summary, simple_summary, direct, fee_measures, anchors, fingerp
               f"scheduled calendar through {diagnostics['fomc_lookahead']['lookahead_required_through']}; certified by "
               f"{diagnostics['fomc_lookahead']['certified_by']}.",
               f"- **Inception reconstruction.** Resetting the published seeds on 3 May 2021 and NAV on 1 June 2021 "
-              f"leaves the end level within {diagnostics['inception_vs_extended_terminal_difference']:+.4f} (per 100 at the "
-              "index base date) of the extended-history path, so the initialization is forgotten.", "",
+              f"ends within {_ceil(diagnostics['inception_vs_extended_terminal_difference'], 4):.4f} per 100 of the "
+              "extended-history path, so the starting state is forgotten.", "",
               "## Limitations", "",
-              "- The ten-year study precedes the 1 June 2021 index base date and the 28 July 2023 launch date.",
+              "- No comparison with official GSEQTMX levels was made, so tracking error is unknown, including for the "
+              "live period since 28 July 2023.",
+              "- GS states that its backtests may use slightly different data sources, approximations and methodology; "
+              "the published-figure checks and fingerprint verdicts depend on those backtests following the "
+              "methodology.",
+              "- The ten-year study begins before the 1 June 2021 index base date and the 28 July 2023 launch date, so "
+              "its early years are a research extension, not a period the index covers.",
               "- Yahoo prices/actions and FRED final-vintage DFF and DTB3 are proxies, not the calculation agent's "
-              "inputs; DTB3 is converted from bank-discount to money-market yield with a 91-day tenor.",
+              "inputs; DTB3 is converted from bank-discount to money-market yield with a 91-day tenor. Inputs are a "
+              "frozen snapshot downloaded on 8 October 2026.",
               "- XNYS is a holiday-calendar proxy for NYSE Arca. Calendar mismatches fail the run.",
-              "- The FOMC archive gives final calendars, not a vendor's point-in-time schedule. Unscheduled "
-              "statements and notation votes are excluded, and the four-business-day scheduling test cannot be "
-              "certified historically. 18 March 2020 is a sensitivity case.",
+              "- The FOMC calendar was transcribed from Federal Reserve pages and is a final calendar, not a vendor's "
+              "point-in-time schedule. Unscheduled statements and notation votes are excluded, and the "
+              "four-business-day scheduling test cannot be certified historically.",
               "- Discretionary market disruption, adjustment and restatement decisions are not reproduced.",
               "- The methodology is the July 2023 version; later amendments are not presumed absent.",
               "- An index reconstruction does not reproduce a structured note's participation rate, caps, fees, "
               "or issuer credit exposure.", "",
               "## Resume wording", "",
-              '"Built a source-audited Python reconstruction of a calendar-driven, volatility-controlled equity '
-              'excess-return index (Goldman Sachs Equity TimeX methodology). Implemented quantity-based cost '
-              'accounting, causal signal timing, Shapley fee attribution, and historical and synthetic stress tests. '
-              'Corroborated the implementation against the index\'s published initialization volatilities '
-              '(0.94 EWMA matched to 4 d.p.) and brochure backtest statistics."', "",
-              "Do not describe this as an exact or official replication without an official-level reconciliation.", ""]
+              '"Built an independent Python reconstruction of a calendar-driven, volatility-controlled equity '
+              "excess-return index from Goldman Sachs' published Equity TimeX methodology (personal project; not "
+              "affiliated with Goldman Sachs). Implemented quantity-based cost accounting, causal signal timing, "
+              "Shapley fee attribution, and historical and synthetic stress tests. Checked it against figures Goldman "
+              "Sachs published: the 0.94 EWMA initialization volatility matches to four decimals, the 0.97 EWMA to "
+              f"within {_ceil(seed97_gap, 3):.3f} points, and the brochure's 1-, 3- and 5-year backtest returns to "
+              f'within {_ceil(returns_gap, 1):.1f} points."', "",
+              "Do not describe this as an official replication. Do not call it exact unless it has been reconciled "
+              "against official index levels.", ""]
     (output / "research_report.md").write_text("\n".join(lines))
 
 
@@ -1552,6 +1684,11 @@ def main(argv=None):
                           PRICE_NAME: normalize_path(wealth(market.price_return), anchor),
                           TOTAL_NAME: normalize_path(wealth(market.adj_return), anchor)})
     summary = summary_metrics(paths, market.cash_return, nofee)
+    er_benchmark = normalize_path(wealth(market.adj_return - market.cash_return), anchor)
+    summary.loc[ER_BENCHMARK_NAME] = pd.Series({**performance(er_benchmark, market.cash_return, True),
+                                                "Cumulative Fee Drag": 0.0})
+    periods = period_breakdown(paths.assign(**{ER_BENCHMARK_NAME: er_benchmark}),
+                               feat.weight_held.loc[anchor:], cfg)
     attribution, counterfactuals, direct = run_counterfactuals(market, feat, cfg, anchor)
     cost_shapley = shapley_costs(market, feat, cfg, anchor)
     fee_measures = fee_drag_measures(ledger, nofee, cost_shapley, market.cash_return)
@@ -1578,6 +1715,10 @@ def main(argv=None):
         inception.join(feat_official[["allocation", "algorithmic_vol"]]).to_csv(output/"official_inception_daily.csv", index_label="date")
     sample = ledger.loc[anchor:].iloc[1:]
     costs_scale = 100/ledger.net_level.loc[anchor]
+    seed_date = pd.Timestamp(cfg.official_seed_date)
+    # Sessions between the EWMA warm-up start and the published seed date: how far
+    # the starting value has decayed by the time it is compared with GS's figure.
+    seed_sessions = int(market.index.get_loc(seed_date)) if seed_date in market.index else None
     diagnostics = {"comparison_start": str(anchor.date()), "comparison_end": str(market.index[-1].date()),
                    "comparison_observations": len(paths)-1, "warmup_observations": pos,
                    "mean_held_exposure": float(feat.weight_held.loc[anchor:].iloc[1:].mean()),
@@ -1590,6 +1731,9 @@ def main(argv=None):
                    "cash_vs_adjusted_total_return_max_daily_difference": float((market.cash_total_return-market.adj_return).abs().max()),
                    "max_final_weight_step": float(feat.weight_close.diff().abs().max()),
                    "max_allocation_step": float(feat.allocation.diff().abs().max()),
+                   "first_price": str(market.index[0].date()),
+                   "seed_warmup_sessions": seed_sessions,
+                   "seed_residual_variance_weight_097": float(cfg.lambda_long ** seed_sessions) if seed_sessions else None,
                    "short_mr_max_abs": float(signals.short_mr.abs().max()),
                    "short_mr_theoretical_bound": float(short_mr_bound()),
                    "fomc_lookahead": fomc_lookahead,
@@ -1611,7 +1755,9 @@ def main(argv=None):
                                    market.dcf.loc[start_ext:], cfg)
         official_audit["extended_history"] = audit_official(extended_full.net_level, args.official_levels, cfg.launch_date,
                                                             output, filename="official_reconciliation_extended.csv")
-    exports = {"performance_summary.csv": summary, "equity_curves.csv": paths,
+    exports = {"performance_summary.csv": summary,
+               "equity_curves.csv": paths.assign(**{ER_BENCHMARK_NAME: er_benchmark}),
+               "period_breakdown.csv": periods,
                "daily_audit_ledger.csv": market.join(feat).join(ledger.add_prefix("ledger_")),
                "drag_attribution.csv": attribution, "cost_shapley.csv": cost_shapley,
                "fee_drag_measures.csv": fee_measures, "dividend_convention_audit.csv": dividend_table,
@@ -1625,7 +1771,8 @@ def main(argv=None):
         data.to_csv(output/filename, index_label=data.index.name or "date", float_format="%.12g")
     make_charts(paths, feat, attribution, cost_shapley, fee_measures, anchors, fingerprint, synthetic_paths, output)
     write_report(summary, simple_summary, direct, fee_measures, anchors, fingerprint, historical, synthetic,
-                 sensitivity, dividend_summary, diagnostics, output)
+                 sensitivity, dividend_summary, diagnostics, output, periods=periods, attribution=attribution,
+                 synthetic_paths=synthetic_paths)
     output_hashes = {p.name: sha256(p) for p in sorted(output.iterdir())
                      if p.is_file() and p.name not in ("run_manifest.json", "validation.json")}
     manifest = {"executed_utc": datetime.now(timezone.utc).isoformat(), "config": asdict(cfg),

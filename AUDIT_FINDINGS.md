@@ -7,7 +7,7 @@
 | Governing document | Goldman Sachs Equity TimeX Index Methodology, 28 July 2023 (SHA256 `9c07796d…eef4`) |
 | Explanatory document | GS Equity TimeX brochure, 2023 (SHA256 `ec3a800c…cce2cd`) |
 | Environment | Python 3.13.16 with every package pinned to `requirements-lock.txt` |
-| Outcome | **No financially material formula or timing error found.** All reference results reproduce exactly. Fifteen findings, concerning validation, test adequacy, provenance, interpretation and presentation, are logged below with their remediation. |
+| Outcome | **No financially material formula or timing error found.** All reference results reproduce exactly. Fifteen findings, concerning validation, test adequacy, provenance, interpretation and presentation, are logged below with their remediation, followed by eleven more (F-16 to F-26) from a pre-publication review of the report. |
 
 This is an audit of an independent research reconstruction. It does not certify
 the series as the official GSEQTMX index: official daily levels were not
@@ -111,13 +111,40 @@ disclosure gap with no current effect; **Info** = analytical finding.
 | F-06 | Low | Simplified model | `max(20d, 60d)` skipped NaN, so the 20-day vol alone set exposure while the 60-day window was incomplete (40 sessions in Q1 2014). | Both windows are now required. | None after the 2016 anchor; summary unchanged |
 | F-07 | Low | Provenance | The frozen `download_manifest.json` uses a different schema from the one `download_inputs` writes. It also cites raw acquisition files (`spy_yfinance.csv`, `*_fred_raw.csv`) that are not shipped. | Cannot be fixed retroactively; disclosed here. Frozen CSV hashes are verified by test. New downloads write a consistent manifest with per-file SHA256. | None |
 | F-08 | Info | Signal design | The ±10% clip on short-term MR cannot bind for realistic returns. By Cauchy–Schwarz, \|w⁵\| ≤ 0.75·√55/15·√(10/252) = 7.39% when ln(1+r) ≈ r; it binds only for daily moves of about +80% or more. Sample maximum is 7.01%. | Documented, with a property test. | None |
-| F-09 | Info | Data | The 0.067% gap between cash-dividend TR and Yahoo Adj Close is a reinvestment convention, not noise or a fee. On ex-dates Yahoo returns `Close_t/(Close_{t−1} − D) − 1` to within 0.007 bp, which explains 99.95% of the gap. | `dividend_convention_audit.csv` and a test. | None |
-| F-10 | Info | Interpretation | The original report said the gap loss happened "before de-risking", which understates the mechanism. Because VC uses t−1 vol and MR adds weight after a fall, exposure *rises* from 131% to 138% for the session after a −20% gap, then falls no faster than 50pp per close (88% → 38% → 24%). | `synthetic_paths.csv`, the `synthetic_gap` chart, a test, and talking point 3. | None |
+| F-09 | Info | Data | The 0.067% gap between cash-dividend TR and Yahoo Adj Close is a reinvestment convention, not noise or a fee. On ex-dates Yahoo returns `Close_t/(Close_{t−1} − D) − 1` to within 0.0075 bp, which is reinvestment at the dividend-adjusted prior close (prior close minus the dividend) and explains 99.95% of the gap. | `dividend_convention_audit.csv` and a test. | None |
+| F-10 | Info | Interpretation | The original report said the gap loss happened "before de-risking", which understates the mechanism. Because VC uses t−1 vol and MR adds weight after a fall, held exposure *rises* from 131% to 138% for the session after a −20% gap, then falls no faster than 50pp per close: 88% held in session +2, 38% in +3, 24% in +4. Most of the rise comes from the MR signal; the t−1 volatility lag only explains why exposure is not cut. | `synthetic_paths.csv`, the `synthetic_gap` chart, a test, and talking point 3. | None |
 | F-11 | Info | Source conflict | The brochure says ToM-MR compares performance "on the 5th to last day"; the formula uses EOM−5, the 6th-to-last session. | Formula followed as instructed. The published anchors also favour EOM−5 (F-05 test; fingerprint). | None |
 | F-12 | Low | Reporting | `results/validation.json` was hand-maintained, and its claim of a passed live download cannot be re-verified here. | Regenerated from the executed JUnit result. The live download is recorded as not executed in this session, because network policy blocked the providers. | None |
 | F-13 | Low | Presentation | Daily exposure was unreadable at ten-year scale, a legend covered data, colours were unexplained, the attribution was not a waterfall, and the SVG embedded a timestamp and random IDs. | Charts redesigned with a validated palette, direct labels and a 21-session mean. Outputs are deterministic: two runs are byte-identical apart from the manifest timestamp. | None |
 | F-14 | Low | Reconciliation | The official-level check had no rounding-aware comparison (GS publishes 2 dp, 0.005 rounded up), no per-regime bias or level error, and silently dropped official dates that are not sessions. | Added level-for-level 2-dp comparison, regime metrics, an unmatched-date count, and an extended-history reconciliation. A rounding-only stand-in shows a noise floor of about 0.06% annualized TE and ≤0.005 level error. | None |
 | F-15 | Low | Environment | `pip install -r requirements.txt` resolves newer transitive packages than the lock file (lxml, pycparser, pytz, tzdata). | CI installs `requirements-lock.txt` on Python 3.12 and 3.13. | None |
+
+### Pre-publication review (second round)
+
+Before the research report was published as a web page, five separate reviewers
+checked it. Their briefs were: every prose number, every table cell (242 cells,
+read with an independent parser), compliance wording, accuracy against the
+methodology PDF, and rendering at desktop and phone widths in both themes. I
+re-derived each numeric claim before acting on it. Findings that also affected
+the repository's own outputs:
+
+| ID | Sev. | Area | Finding | Action | Effect on reference results |
+|---|---|---|---|---|---|
+| F-16 | Medium | Interpretation | The report said exposure "first fell below 50% 2 sessions after the shock". That count used weights *set* at a close, while the chart and the rest of the sentence use exposure *held* over each session, which is first below 50% in session +3. | Metric renamed to `First Session With Held Exposure Below 50%` (held basis, = 3); test updated. | None |
+| F-17 | Medium | Presentation | The anchor chart drew every contradicted convention on every row, so crosses appeared on rows whose figure does not contradict that convention. | Each row now shows only conventions that figure contradicts; the legend says so. | None |
+| F-18 | Medium | Disclosure | Results were not labelled hypothetical, and tables called reconstruction figures "Index". | Report status now carries a hypothetical / not-advice / not-affiliated disclosure; tables say "Reconstruction". | None |
+| F-19 | Medium | Disclosure | The blended ten-year CAGR hid the regimes: 12.89% a year before the base date, −0.11% from base date to launch, 2.90% since launch (SPY TR 17.59% / 5.66% / 19.57%). | `period_breakdown.csv` and a report section; test. | None (new output) |
+| F-20 | Medium | Comparison basis | An excess-return index was compared on CAGR only with SPY total return, which includes the cash rate. | Added the like-for-like `SPY Total Return minus Fed Funds` row (12.70% CAGR, 330.40). | Adds a row; existing rows unchanged |
+| F-21 | Low | Balance | April 2025 showed only the selloff leg; COVID showed both legs. | Added `April 2025 rebound` (8 Apr to 30 Jun 2025: +5.33% vs +24.81% SPY TR). | Adds a row |
+| F-22 | Low | Clarity | Financing cost appeared as both 33.93 (fees charged) and 38.0 (pre-fee bridge step) with no explanation. | Each figure now states its basis. | None |
+| F-23 | Info | Analysis | The bridge's "+133.7 signal allocation" step is measured before volatility control. With the full policy recomputed, removing all signals raises terminal wealth (192.08 → 195.91) and reduces drawdown, so over this sample the signals did not add value after volatility control. | Stated in the report and README. | None |
+| F-24 | Low | Disclosure | The 4-dp seed match could look circular, because the EWMA warm-up starts from the published seeds. After 1,845 sessions the starting variance weight is ≤3.9e-25, so the match does not come from the seed. | Stated in the report and methodology audit. | None |
+| F-25 | Low | Accuracy | "The study precedes the base and launch dates" was false as written (the study spans them). The dividend identity is reinvestment at the dividend-adjusted prior close, not the prior close. The gap-chart annotation credited the volatility lag for the exposure rise, which the MR signal mostly drives. | Wording corrected in the report, chart annotation, README and this log. | None |
+| F-26 | Low | Presentation | Chart text was about 8 px at page width; one legend touched the tick labels. | Figures redrawn on smaller canvases (same point sizes); legends moved. | None |
+
+The resume wording no longer says "source-audited". It now states independence
+and quotes the anchor agreement precisely (0.94 to four decimals, 0.97 within
+0.003, returns within 0.4 points).
 
 ## 5. Changes in results, assumptions or interpretation
 

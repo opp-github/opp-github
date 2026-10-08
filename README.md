@@ -27,7 +27,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-lock.txt   # exact environment; requirements.txt pins direct deps only
 python run.py --offline                          # frozen snapshot; end date 2026-10-08 read from its manifest
-python -m pytest -q                              # 70 offline tests
+python -m pytest -q                              # 72 offline tests
 ```
 
 `python run.py --offline --end 2026-10-08` is equivalent. The offline run
@@ -178,7 +178,22 @@ initialization has been forgotten.
 | TimeX research reconstruction | 6.75% | 10.04% | 0.703 | −19.32% | 192.08 |
 | SPY Price Return | 13.71% | 18.01% | 0.668 | −34.10% | 361.43 |
 | SPY Total Return | 15.52% | 17.95% | 0.758 | −33.72% | 423.22 |
+| SPY Total Return minus Fed Funds (like-for-like excess return) | 12.70% | 17.95% | 0.758 | −33.79% | 330.40 |
 | Requested simplified approximation (not the index) | 5.72% | 9.74% | 0.621 | −16.26% | 174.32 |
+
+All figures are hypothetical: the published rules applied to historical data.
+The blended ten-year CAGR hides three regimes (`results/period_breakdown.csv`):
+
+| Period | Reconstruction CAGR | SPY TR CAGR |
+|---|---:|---:|
+| 7 Oct 2016 to 1 Jun 2021 (before the index base date) | 12.89% | 17.59% |
+| 1 Jun 2021 to 28 Jul 2023 (base date to launch) | −0.11% | 5.66% |
+| 28 Jul 2023 to 7 Oct 2026 (since launch) | 2.90% | 19.57% |
+
+With the full policy recomputed, removing all five signals (a plain 10% volatility
+target) raises terminal wealth from 192.08 to 195.91 and reduces the maximum
+drawdown from −19.32% to −16.73%. Over this sample the signals did not add value
+after volatility control.
 
 **Consistency with GS-published figures.** These are GS backtest figures built
 on GS data, not official daily levels.
@@ -215,7 +230,8 @@ They cannot distinguish DTB3 from DFF funding.
 | `daily_audit_ledger.csv` | Inputs, rates, masks, signals, EWMAs, weights, quantities and daily charges |
 | `drag_attribution.csv`, `cost_shapley.csv`, `fee_drag_measures.csv` | Attribution and the four fee measures |
 | `dividend_convention_audit.csv` | Per-ex-date cash versus vendor dividend treatment |
-| `historical_stress.csv`, `synthetic_stress.csv`, `synthetic_paths.csv` | Stress windows, synthetic scenarios, and their daily exposure paths |
+| `historical_stress.csv`, `synthetic_stress.csv`, `synthetic_paths.csv` | Stress windows (COVID and April 2025, each selloff and rebound; 2022), synthetic scenarios, and their daily exposure paths |
+| `period_breakdown.csv` | CAGR, volatility, drawdown and exposure before the base date, from base date to launch, and since launch |
 | `parameter_sensitivity.csv` | Target, cap, EWMA, signal, funding and 18 March 2020 calendar cases |
 | `published_anchor_checks.csv`, `convention_fingerprint.csv` | External consistency checks |
 | `requested_approximation_daily.csv`, `_summary.csv` | Simplified model and diagnostic masks |
@@ -241,7 +257,7 @@ Input validation fails loudly on:
 - insufficient warm-up
 - FOMC coverage that is too short, including the two-session look-ahead
 
-The 70 offline tests cover:
+The 72 offline tests cover:
 
 - signal windows, including fixtures that distinguish EOM−5 from EOM−4 and OE−4
   from OE−3
@@ -264,8 +280,10 @@ CI (`.github/workflows/tests.yml`) installs the lock file on Python 3.12 and
 
 ## Limitations
 
-- The study extends before the 1 June 2021 index base date and the 28 July 2023
-  launch date.
+- The ten-year study begins before the 1 June 2021 index base date and the
+  28 July 2023 launch date, so its early years are a research extension.
+- No comparison with official GSEQTMX levels was made; tracking error, including
+  for the live period, is unknown.
 - Yahoo prices and actions and FRED final-vintage DFF and DTB3 are proxies for
   the calculation agent's inputs. DTB3 is a bank-discount yield, converted
   with a 91-day tenor.

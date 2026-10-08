@@ -120,7 +120,10 @@ recursion. For comparison, a Close-only ER gives 12.1009%, and an EWMA on
 unallocated SPY gives 11.4214%. The brochure's 1/3/5-year returns to 28 July
 2023 (2.15% / 5.32% / 6.02%) compare with 2.52% / 5.22% / 6.07%.
 
-These anchors corroborate the conventions; they do not certify the series.
+These anchors corroborate the conventions; they do not certify the series. No earlier EWMA state is
+published, so the warm-up starts on 2 January 2014 from the published values
+themselves. After 1,845 sessions the starting variance carries a weight of at
+most 0.97^1845 = 3.9e-25, so the 3 May 2021 match does not come from the seed.
 
 ## Additional analytic results
 
@@ -131,14 +134,16 @@ These anchors corroborate the conventions; they do not certify the series.
   binds only for daily gains of roughly 80% or more. The sample maximum is
   7.01%, and the bound is attained in a test.
 - **Vendor dividend convention.** Yahoo's adjusted close implies an ex-date
-  return of `Close_t / (Close_{t−1} − D_t) − 1`, which reinvests at the prior
-  close. §11 credits `(Close_t + D_t)/Close_{t−1} − 1`. The difference,
+  return of `Close_t / (Close_{t−1} − D_t) − 1`, which reinvests the dividend at the
+  dividend-adjusted prior close (`Close_{t−1} − D_t`). §11 credits `(Close_t + D_t)/Close_{t−1} − 1`. The difference,
   `D(Close_t − Close_{t−1} + D) / (Close_{t−1}(Close_{t−1} − D))`, explains
   99.95% of the 0.067% ten-year gap. It is a convention difference, not a fee.
 - **Gap timing.** Because the target uses VC_{t−1}, the close on a shock day
   still uses pre-shock volatility. Exposure can therefore *rise* for the next
   session; after a −20% gap in the synthetic test it went from 131% to 138%.
-  It then falls no faster than 50pp per close.
+  Most of that rise comes from the short-term mean-reversion signal leaning against
+  the fall; the lag only explains why exposure is not cut. Held exposure then
+  falls no faster than 50pp per close (88% in session +2, 38% in +3).
 - **FOMC look-ahead.** The decision at the final price close depends on the
   next two sessions, so calendar coverage must certify them
   (`next_scheduled_after_coverage`).
@@ -158,8 +163,8 @@ logged and remediated in [`AUDIT_FINDINGS.md`](AUDIT_FINDINGS.md). Notably, the
 original suite did not pin the EOM−5 and OE−4 reference dates: mutants using
 EOM−4 or OE−3 passed every methodology test.
 
-The complete offline suite passes **70 tests** using `python -m pytest -q`.
-The original 40 are unchanged. The audit added 30 covering:
+The complete offline suite passes **72 tests** using `python -m pytest -q`.
+The original 40 are unchanged. The audit added 32 covering:
 
 - discriminating ToM and OpEx reference-date fixtures
 - a frozen-snapshot regression and the published-seed fingerprint
@@ -170,3 +175,4 @@ The original 40 are unchanged. The audit added 30 covering:
 - rounding-aware official reconciliation
 - synthetic gap exposure dynamics
 - the cross-implementation check
+- the regime breakdown, the excess-return benchmark and the April 2025 rebound window
